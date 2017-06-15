@@ -18,84 +18,84 @@ This script was developed to assist customers with their exchange hybrid migrati
 1. Create migration schedule (this is built in the format required by the Microsoft FastTrack Mail Migration team)
 
 ## Available switches and examples
-* PARAMETER InputMailboxesCSV
+* PARAMETER InputMailboxesCSV  
 Use this parameter to specify a list of users to collect permissions for, rather than all mailboxes.
 Make sure that the CSV file provided has a header titled "PrimarySMTPAddress"
 
-* PARAMETER ExcludeServiceAccts
+* PARAMETER ExcludeServiceAccts  
 In cases where you have service accounts with permissions to a large number of mailboxes, e.g. Blackberry service accounts, you can use this to exclude those accounts as part of the batching mechanism. Otherwise you'll end up with huge batches. 
 The parameter can be populated as following (use the service accounts primarysmtpaddress):
  
-[string[]]$ExcludeServiceAccts = @("user1@contoso.com","user2@contoso.com"),
-[string[]]$ExcludeServiceAccts = (get-content "C:\Users\administrator\Desktop\userlist.csv")
+[string[]]$ExcludeServiceAccts = @("user1@contoso.com","user2@contoso.com")  
+[string[]]$ExcludeServiceAccts = (get-content "C:\Users\administrator\Desktop\userlist.csv")  
 
 *This will slow down processing. 
 
-* PARAMETER FullAccess
+* PARAMETER FullAccess  
 Collect Full Access permissions. Keep in mind that "Full Access" permissions are now supported in cross premises scenarios. Not including "Full Access" will speed up processing. 
 
-* PARAMETER SendOnBehalfTo
+* PARAMETER SendOnBehalfTo    
 Collect SendOnBehalfTo permissions
 
-* PARAMETER Calendar
+* PARAMETER Calendar  
 Collect calendar permissions
 
-* PARAMETER SendAs
+* PARAMETER SendAs  
 Collect Send As permissions
 
-* PARAMETER EnumerateGroups
+* PARAMETER EnumerateGroups  
 This will enumerate groups that have permissions to mailboxes and include in the batching logic.
 
 *This will slow down processing.*
 
-* PARAMETER ExcludeGroups
+* PARAMETER ExcludeGroups  
 Use this to exclude groups that you don't want to enumerate. This can be used to speed up processing in environments where groups are heavily used. Use group name.   
 
-[string[]]$ExcludeGroups = @("group1@contoso.com","group2@contoso.com"),
-[string[]]$ExcludeGroups = (get-content "C:\Users\administrator\Desktop\groupList.csv")
+[string[]]$ExcludeGroups = @("group1@contoso.com","group2@contoso.com")  
+[string[]]$ExcludeGroups = (get-content "C:\Users\administrator\Desktop\groupList.csv")  
 
-* PARAMETER ExchServerFQDN
+* PARAMETER ExchServerFQDN  
 Connect to a specific Exchange Server
 
-* PARAMETER Resume
+* PARAMETER Resume  
 Use this to resume the script in case of a failure while running the script on a large number of users. This way you don't have to start all over.
 The way this works is that it will look for the progress xml file where it keeps track of mailboxes that are pending processing.
 Make sure not to use in conjunction with the InputMailboxesCSV switch.
 
-* PARAMETER BatchUsers
+* PARAMETER BatchUsers  
 Use this if you want to skip collecting permissions and only run Step 2 and Step 3. 
 Make sure you have the permissions output file in the same directory (Find-MailboxDelegates-Permissions.csv).
 
-* EXAMPLE
-#Export only SendOnBehalfTo and Send As permissions and Enumerate Groups for all mailboxes.  
+* EXAMPLE  
+#Export only SendOnBehalfTo and Send As permissions and Enumerate Groups for all mailboxes.    
 .\Find-MailboxDelegates.ps1 -SendOnBehalfTo -SendAs -EnumerateGroups
 
-* EXAMPLE
-#Export only Full Access and Send As permissions and Enumerate Groups for the provided user list. Make sure to use "PrimarySMTPAddress" as header. 
+* EXAMPLE  
+#Export only Full Access and Send As permissions and Enumerate Groups for the provided user list. Make sure to use "PrimarySMTPAddress" as header.   
 .\Find-MailboxDelegates.ps1 -InputMailboxesCSV "C:\Users\administrator\Desktop\userlist.csv" -FullAccess -SendAs -EnumerateGroups
 
-* EXAMPLE
-#Resume the script after a script interruption and failure to pick up on where it left off. Make sure to include the same switches as before EXCEPT the InputMailboxesCSV otherwise it'll yell at you
+* EXAMPLE  
+#Resume the script after a script interruption and failure to pick up on where it left off. Make sure to include the same switches as before EXCEPT the InputMailboxesCSV otherwise it'll yell at you  
 .\Find-MailboxDelegates.ps1 -FullAccess -SendAs -EnumerateGroups -Resume
 
-* EXAMPLE
-#Export all permissions and enumerate groups for all mailboxes
+* EXAMPLE  
+#Export all permissions and enumerate groups for all mailboxes  
 .\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -EnumerateGroups 
 
-* EXAMPLE
-#Export all permissions but don't enumerate groups for all mailboxes
+* EXAMPLE  
+#Export all permissions but don't enumerate groups for all mailboxes  
 .\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar
 
 * EXAMPLE
-#Export all permissions and exclude service accounts for all mailboxes
+#Export all permissions and exclude service accounts for all mailboxes  
 .\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAccts "user1@contoso.com","user2@contoso.com" 
 
-* EXAMPLE
-#Export all permissions and exclude service accounts for all mailboxes
+* EXAMPLE  
+#Export all permissions and exclude service accounts for all mailboxes  
 .\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAccts "user1@contoso.com","user2@contoso.com" -ExcludeGroups "group1@contoso.com","group2@contoso.com" 
 
-* EXAMPLE
-#Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 and 3 to batch users
+* EXAMPLE  
+#Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 and 3 to batch users  
 .\Find-MailboxDelegates.ps1 -BatchUsers
 
 # Contributing
