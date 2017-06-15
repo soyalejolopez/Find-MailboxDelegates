@@ -48,7 +48,7 @@ This will enumerate groups that have permissions to mailboxes and include in the
 
 *This will slow down processing.*
 
-* PARAMETER ExcludeGroups  
+  * PARAMETER ExcludeGroups  
 Use this to exclude groups that you don't want to enumerate. This can be used to speed up processing in environments where groups are heavily used. Use group name.   
 
 [string[]]$ExcludeGroups = @("group1@contoso.com","group2@contoso.com")  
