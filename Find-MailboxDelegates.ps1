@@ -140,22 +140,21 @@ Begin{
     try{
         ""
         Write-Host "Pre-Flight Check" -ForegroundColor Green
-        try{
-            #Requirement is Powershell V3 in order to use PSCustomObjets which are data structures
-            If($host.version.major -lt 3){
-                throw "Powershell V3+ is required."
-            }
+        
+        #Requirement is Powershell V3 in order to use PSCustomObjets which are data structures
+        If($host.version.major -lt 3){
+            throw "Powershell V3+ is required."
+        }
 
-            If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume)){
-                throw "BatchUsers can't be combined with these other switches."
-                exit
-            }
-            If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers){
-                throw "Include the switches for the permissions you want to query on. Check the read me file for more details."
-            }
+        If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume)){
+            throw "BatchUsers can't be combined with these other switches."
+        }
+        If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers){
+            throw "Include the switches for the permissions you want to query on. Check the read me file for more details."
+        }
 
-            #Load functions
-            Function Write-LogEntry {
+        #Load functions
+        Function Write-LogEntry {
                param(
                   [string] $LogName ,
                   [string] $LogEntryText,
@@ -171,7 +170,7 @@ Begin{
                }
             }
 
-            Function Get-Permissions(){
+        Function Get-Permissions(){
 	            param(
                     [string]$UserEmail,
                     [bool]$gatherfullaccess,
@@ -414,7 +413,7 @@ Begin{
                 }
             }
 
-            Function Create-Batches(){
+        Function Create-Batches(){
                 param(
                     [string]$InputPermissionsFile
                 )
@@ -471,7 +470,7 @@ Begin{
                 }
             }
 
-            Function Find-Links($hashData){
+        Function Find-Links($hashData){
                 try{
                     $nextInHash = $hashData.Keys | select -first 1
                     $batch.Add($nextInHash,$hashData[$nextInHash])
@@ -510,7 +509,7 @@ Begin{
                 }
             }
 
-            Function Create-BatchFile($batchResults,$usersWithNoDepsResults){
+        Function Create-BatchFile($batchResults,$usersWithNoDepsResults){
 	            try{
                      "Batch,User" > $Script:BatchesFile
 	                 foreach($key in $batchResults.keys){
@@ -537,7 +536,7 @@ Begin{
                  }
             } 
 
-            Function Create-MigrationSchedule(){
+        Function Create-MigrationSchedule(){
                 param(
                     [string]$InputBatchesFile 
                 )
@@ -589,8 +588,33 @@ Begin{
                 }
             }
 
-            If($ExchServerFQDN -ne ""){
+        If($ExchServerFQDN -ne ""){
+            try{
+                $Creds = Get-Credential
+                ""
+                #If want to save creds without having to enter password into Get-Credential every time
+                #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
+                #$username = "administrator@contoso.com" 
+                #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
+
+                #Create a new ps session to exchange server
+	            $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue'
+	            #Connect and import module just incase if you are running it from Powershell and not from EMS
+	            $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
+            }
+            catch{
+                throw "Unable to establish a session with the Exchange Server: $($ExchServerFQDN)"
+                exit
+            }
+        }
+        Else{
+            #check if a session already exists
+            $error.clear()
+            get-command get-mailbox -ErrorAction SilentlyContinue | out-null
+            If($error){
                 try{
+                    $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
+
                     $Creds = Get-Credential
                     ""
                     #If want to save creds without having to enter password into Get-Credential every time
@@ -608,142 +632,113 @@ Begin{
                     exit
                 }
             }
-            Else{
-                #check if a session already exists
-                $error.clear()
-                get-command get-mailbox -ErrorAction SilentlyContinue | out-null
-                If($error){
-                    try{
-                        $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
+        }
 
-                        $Creds = Get-Credential
-                        ""
-                        #If want to save creds without having to enter password into Get-Credential every time
-                        #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
-                        #$username = "administrator@contoso.com" 
-                        #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
-
-                        #Create a new ps session to exchange server
-	                    $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue'
-	                    #Connect and import module just incase if you are running it from Powershell and not from EMS
-	                    $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
-                    }
-                    catch{
-                        throw "Unable to establish a session with the Exchange Server: $($ExchServerFQDN)"
-                        exit
-                    }
-                }
-            }
-
-            #Load pre-reqs
-            $ExchangeVersion = GCM Exsetup.exe | % {$_.FileVersionInfo} | select -ExpandProperty FileVersion
-            $Build = ($ExchangeVersion.tostring()).Split(".")[0]
-            If(($Build -eq "08") -or ($Build -eq "8")){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.Admin -ErrorAction SilentlyContinue; $AdminSessionADSettings.ViewEntireForest = $True}
-            ElseIf($Build -eq "14"){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue; Set-AdServerSettings -ViewEntireForest $True -warningaction "SilentlyContinue"}
-            ElseIf($Build -eq "15"){Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue; Set-AdServerSettings -ViewEntireForest $True -warningaction "SilentlyContinue"}
+        #Load pre-reqs
+        $ExchangeVersion = GCM Exsetup.exe | % {$_.FileVersionInfo} | select -ExpandProperty FileVersion
+        $Build = ($ExchangeVersion.tostring()).Split(".")[0]
+        If(($Build -eq "08") -or ($Build -eq "8")){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.Admin -ErrorAction SilentlyContinue; $AdminSessionADSettings.ViewEntireForest = $True}
+        ElseIf($Build -eq "14"){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue; Set-AdServerSettings -ViewEntireForest $True -warningaction "SilentlyContinue"}
+        ElseIf($Build -eq "15"){Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue; Set-AdServerSettings -ViewEntireForest $True -warningaction "SilentlyContinue"}
         
-            $scriptPath = $PSScriptRoot
+        $scriptPath = $PSScriptRoot
 
-            #Open connection to AD - this will be used to enumerate groups and collect Send As permissions
-            If(($EnumerateGroups -eq $true) -or ($SendAs -eq $true)){ 
-                $dse = [ADSI]"LDAP://Rootdse"
-                $ext = [ADSI]("LDAP://CN=Extended-Rights," + $dse.ConfigurationNamingContext)
-                $dn = [ADSI]"LDAP://$($dse.DefaultNamingContext)"
-                $dsLookFor = new-object System.DirectoryServices.DirectorySearcher($dn)
+        #Open connection to AD - this will be used to enumerate groups and collect Send As permissions
+        If(($EnumerateGroups -eq $true) -or ($SendAs -eq $true)){ 
+            $dse = [ADSI]"LDAP://Rootdse"
+            $ext = [ADSI]("LDAP://CN=Extended-Rights," + $dse.ConfigurationNamingContext)
+            $dn = [ADSI]"LDAP://$($dse.DefaultNamingContext)"
+            $dsLookFor = new-object System.DirectoryServices.DirectorySearcher($dn)
 
-                $permission = "Send As"
-                $right = $ext.psbase.Children | ? { $_.DisplayName -eq $permission }
-            }
+            $permission = "Send As"
+            $right = $ext.psbase.Children | ? { $_.DisplayName -eq $permission }
+        }
 
-            #Script Variables
-            $elapsed = [System.Diagnostics.Stopwatch]::StartNew()
-            $yyyyMMdd = Get-Date -Format 'yyyyMMdd'
-            $LogFile = "$scriptPath\Find-MailboxDelegates-$yyyyMMdd.log"
-            $PermsOutputFile = "$scriptPath\Find-MailboxDelegates-Permissions.csv"
-            $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
-            $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
-            $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
+        #Script Variables
+        $elapsed = [System.Diagnostics.Stopwatch]::StartNew()
+        $yyyyMMdd = Get-Date -Format 'yyyyMMdd'
+        $LogFile = "$scriptPath\Find-MailboxDelegates-$yyyyMMdd.log"
+        $PermsOutputFile = "$scriptPath\Find-MailboxDelegates-Permissions.csv"
+        $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
+        $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
+        $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
 
-            #Get Mailboxes
-            If($Resume){
-                If(!$InputMailboxesCSV){
-                    If(test-path $ProgressXMLFile){
-                        $xmlDoc = [System.Xml.XmlDocument](Get-Content $ProgressXMLFile)
-                        $ListOfMailboxes = $xmlDoc.mailboxes.mailbox | ?{$_.Progress -eq "Pending"} | select @{N="PrimarySMTPAddress";E={$_.name}} #-expandproperty name               
-                    }
-                    else{
-                        throw "Unable to resume due to missing progress file: $($ProgressXMLFile)"
-                        exit
-                    }
-                 }
-                 Else{
-                    throw "Can't have both 'Resume' and 'InputMailboxesCSV' at the same time. Choose 'Resume' if you want to pick up on where you left off from a previous run."
+        #Get Mailboxes
+        If($Resume){
+            If(!$InputMailboxesCSV){
+                If(test-path $ProgressXMLFile){
+                    $xmlDoc = [System.Xml.XmlDocument](Get-Content $ProgressXMLFile)
+                    $ListOfMailboxes = $xmlDoc.mailboxes.mailbox | ?{$_.Progress -eq "Pending"} | select @{N="PrimarySMTPAddress";E={$_.name}} #-expandproperty name               
+                }
+                else{
+                    throw "Unable to resume due to missing progress file: $($ProgressXMLFile)"
                     exit
-                 }        
-            }
-            ElseIf(!$Batchusers){
-                If($InputMailboxesCSV -ne ""){
-                    $ListOfMailboxes = Import-Csv $InputMailboxesCSV
-                    if($ListOfMailboxes.PrimarySMTPAddress -eq $null){
-                        throw "Make sure the input csv file header is: PrimarySMTPAddress"
-                        exit
-                    }
-
-                    #write to xml for progress tracking
-                    [xml]$xmlDoc = New-Object System.Xml.XmlDocument
-                    $dec = $xmlDoc.CreateXmlDeclaration("1.0","UTF-8",$null)
-                    $xmlDoc.AppendChild($dec) | Out-Null
-                    $root = $xmlDoc.CreateNode("element","Mailboxes",$null)
-                    foreach($entry in $ListOfMailboxes.PrimarySMTPAddress){
-                        $mbx = $xmlDoc.CreateNode("element","Mailbox",$null)
-                        $mbx.SetAttribute("Name",$entry)
-                        $mbx.SetAttribute("Progress","Pending")
-                        $root.AppendChild($mbx) | Out-Null
-                    }
-
-                    #add root to the document
-                    $xmlDoc.AppendChild($root) | Out-Null
-
-                    #save file
-                    $xmlDoc.save($ProgressXMLFile)
+                }
                 }
                 Else{
-                    $ListOfMailboxes = Get-Mailbox -ResultSize Unlimited | select PrimarySMTPAddress
-
-                    #write to xml for progress tracking
-                    [xml]$xmlDoc = New-Object System.Xml.XmlDocument
-                    $dec = $xmlDoc.CreateXmlDeclaration("1.0","UTF-8",$null)
-                    $xmlDoc.AppendChild($dec) | Out-Null
-                    $root = $xmlDoc.CreateNode("element","Mailboxes",$null)
-                    foreach($entry in $ListOfMailboxes.PrimarySMTPAddress){
-                        $mbx = $xmlDoc.CreateNode("element","Mailbox",$null)
-                        $mbx.SetAttribute("Name",$entry)
-                        $mbx.SetAttribute("Progress","Pending")
-                        $root.AppendChild($mbx) | Out-Null
-                    }
-
-                    #add root to the document
-                    $xmlDoc.AppendChild($root) | Out-Null
-
-                    #save file
-                    $xmlDoc.save($ProgressXMLFile)
+                throw "Can't have both 'Resume' and 'InputMailboxesCSV' at the same time. Choose 'Resume' if you want to pick up on where you left off from a previous run."
+                exit
+                }        
+        }
+        ElseIf(!$Batchusers){
+            If($InputMailboxesCSV -ne ""){
+                $ListOfMailboxes = Import-Csv $InputMailboxesCSV
+                if($ListOfMailboxes.PrimarySMTPAddress -eq $null){
+                    throw "Make sure the input csv file header is: PrimarySMTPAddress"
+                    exit
                 }
-            }
 
-            Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Completed" -ForegroundColor Green
-            ""
+                #write to xml for progress tracking
+                [xml]$xmlDoc = New-Object System.Xml.XmlDocument
+                $dec = $xmlDoc.CreateXmlDeclaration("1.0","UTF-8",$null)
+                $xmlDoc.AppendChild($dec) | Out-Null
+                $root = $xmlDoc.CreateNode("element","Mailboxes",$null)
+                foreach($entry in $ListOfMailboxes.PrimarySMTPAddress){
+                    $mbx = $xmlDoc.CreateNode("element","Mailbox",$null)
+                    $mbx.SetAttribute("Name",$entry)
+                    $mbx.SetAttribute("Progress","Pending")
+                    $root.AppendChild($mbx) | Out-Null
+                }
+
+                #add root to the document
+                $xmlDoc.AppendChild($root) | Out-Null
+
+                #save file
+                $xmlDoc.save($ProgressXMLFile)
+            }
+            Else{
+                $ListOfMailboxes = Get-Mailbox -ResultSize Unlimited | select PrimarySMTPAddress
+
+                #write to xml for progress tracking
+                [xml]$xmlDoc = New-Object System.Xml.XmlDocument
+                $dec = $xmlDoc.CreateXmlDeclaration("1.0","UTF-8",$null)
+                $xmlDoc.AppendChild($dec) | Out-Null
+                $root = $xmlDoc.CreateNode("element","Mailboxes",$null)
+                foreach($entry in $ListOfMailboxes.PrimarySMTPAddress){
+                    $mbx = $xmlDoc.CreateNode("element","Mailbox",$null)
+                    $mbx.SetAttribute("Name",$entry)
+                    $mbx.SetAttribute("Progress","Pending")
+                    $root.AppendChild($mbx) | Out-Null
+                }
+
+                #add root to the document
+                $xmlDoc.AppendChild($root) | Out-Null
+
+                #save file
+                $xmlDoc.save($ProgressXMLFile)
+            }
         }
-        catch{
-            Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Failed: $($_)" -ForegroundColor Green
-            exit
-        }
+
+        Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Completed" -ForegroundColor Green
+        ""
     }
 
     catch{
-        Write-LogEntry -LogName:$LogFile -LogEntryText $_ -ForegroundColor Red
+        Write-Host "Pre-flight failed: $_" -ForegroundColor Red
         If($session){
             Remove-PSSession $Session
         }
+        ""
 		exit
 	}
 }
