@@ -590,16 +590,19 @@ Begin{
 
         If($ExchServerFQDN -ne ""){
             try{
-                $Creds = Get-Credential
                 ""
                 #If want to save creds without having to enter password into Get-Credential every time
                 #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
                 #$username = "administrator@contoso.com" 
                 #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
 
-                #Create a new ps session to exchange server
-	            $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue'
-	            #Connect and import module just incase if you are running it from Powershell and not from EMS
+                $ExchServerFQDN = "$env:computername.$env:userdnsdomain"
+                $Creds = Get-Credential -Message "This account will be used to connect to exchange on premises"
+	            $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
+                If(!$session){
+                    $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
+                    $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
+                }
 	            $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
             }
             catch{
@@ -613,18 +616,19 @@ Begin{
             get-command get-mailbox -ErrorAction SilentlyContinue | out-null
             If($error){
                 try{
-                    $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
-
-                    $Creds = Get-Credential
                     ""
                     #If want to save creds without having to enter password into Get-Credential every time
                     #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
                     #$username = "administrator@contoso.com" 
                     #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
 
-                    #Create a new ps session to exchange server
-	                $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue'
-	                #Connect and import module just incase if you are running it from Powershell and not from EMS
+                    $ExchServerFQDN = "$env:computername.$env:userdnsdomain"
+                    $Creds = Get-Credential -Message "This account will be used to connect to exchange on premises"
+	                $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
+                    If(!$session){
+                        $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
+                        $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
+                    }
 	                $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
                 }
                 catch{
@@ -633,15 +637,6 @@ Begin{
                 }
             }
         }
-
-        #Load pre-reqs
-        $ExchangeVersion = GCM Exsetup.exe | % {$_.FileVersionInfo} | select -ExpandProperty FileVersion
-        $Build = ($ExchangeVersion.tostring()).Split(".")[0]
-        If(($Build -eq "08") -or ($Build -eq "8")){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.Admin -ErrorAction SilentlyContinue; $AdminSessionADSettings.ViewEntireForest = $True}
-        ElseIf($Build -eq "14"){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue; Set-AdServerSettings -ViewEntireForest $True -warningaction "SilentlyContinue"}
-        ElseIf($Build -eq "15"){Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn -ErrorAction SilentlyContinue; Set-AdServerSettings -ViewEntireForest $True -warningaction "SilentlyContinue"}
-        
-        $scriptPath = $PSScriptRoot
 
         #Open connection to AD - this will be used to enumerate groups and collect Send As permissions
         If(($EnumerateGroups -eq $true) -or ($SendAs -eq $true)){ 
@@ -656,6 +651,7 @@ Begin{
 
         #Script Variables
         $elapsed = [System.Diagnostics.Stopwatch]::StartNew()
+        $scriptPath = $PSScriptRoot
         $yyyyMMdd = Get-Date -Format 'yyyyMMdd'
         $LogFile = "$scriptPath\Find-MailboxDelegates-$yyyyMMdd.log"
         $PermsOutputFile = "$scriptPath\Find-MailboxDelegates-Permissions.csv"
