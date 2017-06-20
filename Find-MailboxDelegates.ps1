@@ -43,13 +43,10 @@ Sam Portelli - Sam.Portelli@microsoft.com
 Use this parameter to specify a list of users to collect permissions for, rather than all mailboxes.
 Make sure that the CSV file provided has a header titled "PrimarySMTPAddress"
 
-.PARAMETER ExcludeServiceAccts
-In cases where you have service accounts with permissions to a large number of mailboxes, e.g. Blackberry service accounts, you can use this to exclude those accounts as part of the batching mechanism. Otherwise you'll end up with huge batches. 
-The parameter can be populated as following (use the service accounts primarysmtpaddress):
+.PARAMETER ExcludeServiceAcctsCSV
+In cases where you have service accounts with permissions to a large number of mailboxes, e.g. Blackberry service accounts, you can use this to exclude those accounts from the batching processing. 
+Provide the path to a csv file (no header needed) with each service account primarySMTPaddress on its own line. 
  
-[string[]]$ExcludeServiceAccts = @("user1@contoso.com","user2@contoso.com"),
-[string[]]$ExcludeServiceAccts = (get-content "C:\Users\administrator\Desktop\userlist.csv")
-
 *This will slow down processing. 
 
 .PARAMETER FullAccess
@@ -69,11 +66,8 @@ This will enumerate groups that have permissions to mailboxes and include in the
 
 *This will slow down processing.
 
-.PARAMETER ExcludeGroups
-Use this to exclude groups that you don't want to enumerate. This can be used to speed up processing in environments where groups are heavily used. Use group name.   
-
-[string[]]$ExcludeGroups = @("group1@contoso.com","group2@contoso.com"),
-[string[]]$ExcludeGroups = (get-content "C:\Users\administrator\Desktop\groupList.csv")
+.PARAMETER ExcludeGroupsCSV
+Use this to exclude groups that you don't want to enumerate. Provide the path to a csv file (no header needed) with each group name on its own line. 
 
 .PARAMETER ExchServerFQDN
 Connect to a specific Exchange Server
@@ -109,11 +103,11 @@ Make sure you have the permissions output file in the same directory (Find-Mailb
 
 .EXAMPLE
 #Export all permissions and exclude service accounts for all mailboxes
-.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAccts "user1@contoso.com","user2@contoso.com" 
+.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAcctsCSV "c:\serviceaccts.csv" 
 
 .EXAMPLE
 #Export all permissions and exclude service accounts for all mailboxes
-.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAccts "user1@contoso.com","user2@contoso.com" -ExcludeGroups "group1@contoso.com","group2@contoso.com" 
+.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAcctsCSV "c:\serviceaccts.csv" -ExcludeGroupsCSV "c:\groups.csv"
 
 .EXAMPLE
 #Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 and 3 to batch users
@@ -129,8 +123,8 @@ param(
     [switch]$Calendar,
     [switch]$SendAs,
     [switch]$EnumerateGroups,
-    [string[]]$ExcludeServiceAccts,
-    [string[]]$ExcludeGroups,
+    [string]$ExcludeServiceAcctsCSV,
+    [string]$ExcludeGroupsCSV,
     [string]$ExchServerFQDN,
     [switch]$Resume,
     [switch]$BatchUsers
@@ -723,6 +717,28 @@ Begin{
                 #save file
                 $xmlDoc.save($ProgressXMLFile)
             }
+        }
+
+        #Get excluded groups
+        If($ExcludeGroupsCSV){
+         If(test-path $ExcludeGroupsCSV){
+            $ExcludeGroups = get-content $ExcludeGroupsCSV
+         }
+         Else{
+            throw "Unable to find the CSV file for excluded groups. Confirm this is the right directory: $($ExcludeGroupsCSV)"
+            exit
+         }   
+        }
+
+        #Get excluded service accts
+        If($ExcludeServiceAcctsCSV){
+         If(test-path $ExcludeServiceAcctsCSV){
+            $ExcludeServiceAccts = get-content $ExcludeServiceAcctsCSV
+         }
+         Else{
+            throw "Unable to find the CSV file for excluded service accounts. Confirm this is the right directory: $($ExcludeServiceAcctsCSV)"
+            exit
+         }   
         }
 
         Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Completed" -ForegroundColor Green
