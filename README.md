@@ -1,5 +1,3 @@
-
-
 # Find-MailboxDelegates
 ## Summary
 Migrating to Exchange Online (EXO) using Exchange Hybrid? Make sure to migrate mailboxes with the same manager or delegate (associated delegates) in the same batch otherwise their access to each other's mailbox will be broken. This is because cross premises permissions are not supported with Exchange hybrid environments. You can read all about it here: https://technet.microsoft.com/en-us/library/jj906433(v=exchg.150).aspx
@@ -8,7 +6,7 @@ This script was developed to assist customers with their exchange hybrid migrati
 
 ## Applies To
 * Exchange 2010
-* Exchange 2013
+v* Exchange 2013
 
 ## Pre-requisites
 * Powershell v3+
@@ -18,7 +16,7 @@ THIS CODE IS PROVIDED AS IS WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPL
 
 # How it works
 ## High level steps
-1. Collect permissions 
+s1. Collect permissions 
 1. Find batches based on the output permissions
 1. Create migration schedule (this is built in the format required by the Microsoft FastTrack Mail Migration team)
 
@@ -27,15 +25,10 @@ THIS CODE IS PROVIDED AS IS WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPL
 Use this parameter to specify a list of users to collect permissions for, rather than all mailboxes.
 Make sure that the CSV file provided has a header titled "PrimarySMTPAddress"
 
-* PARAMETER ExcludeServiceAccts  
-In cases where you have service accounts with permissions to a large number of mailboxes, e.g. Blackberry service accounts, you can use this to exclude those accounts as part of the batching mechanism. Otherwise you'll end up with huge batches. 
-The parameter can be populated as following (use the service accounts primarysmtpaddress):
+* PARAMETER ExcludeServiceAcctsCSV  
+In cases where you have service accounts with permissions to a large number of mailboxes, e.g. Blackberry service accounts, you can use this to exclude those accounts from the batching processing. 
+Provide the path to a csv file (no header needed) with each service account primarySMTPaddress on its own line. 
  
-[string[]]$ExcludeServiceAccts = @("user1@contoso.com","user2@contoso.com")  
-[string[]]$ExcludeServiceAccts = (get-content "C:\Users\administrator\Desktop\userlist.csv")  
-
-*This will slow down processing. 
-
 * PARAMETER FullAccess  
 Collect Full Access permissions. Keep in mind that "Full Access" permissions are now supported in cross premises scenarios. Not including "Full Access" will speed up processing. 
 
@@ -48,16 +41,13 @@ Collect calendar permissions
 * PARAMETER SendAs  
 Collect Send As permissions
 
-* PARAMETER EnumerateGroups  
+* PARAMETER EnumerateGroupsc  
 This will enumerate groups that have permissions to mailboxes and include in the batching logic.
 
 *This will slow down processing.*
 
-  * PARAMETER ExcludeGroups  
-Use this to exclude groups that you don't want to enumerate. This can be used to speed up processing in environments where groups are heavily used. Use group name.   
-
-[string[]]$ExcludeGroups = @("group1@contoso.com","group2@contoso.com")  
-[string[]]$ExcludeGroups = (get-content "C:\Users\administrator\Desktop\groupList.csv")  
+  * PARAMETER ExcludeGroupsCSV  
+Use this to exclude groups that you don't want to enumerate. Provide the path to a csv file (no header needed) with each group name on its own line. 
 
 * PARAMETER ExchServerFQDN  
 Connect to a specific Exchange Server
@@ -93,11 +83,11 @@ Make sure you have the permissions output file in the same directory (Find-Mailb
 
 * EXAMPLE
 #Export all permissions and exclude service accounts for all mailboxes  
-.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAccts "user1@contoso.com","user2@contoso.com" 
+.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAcctsCSV "c:\serviceaccts.csv"
 
 * EXAMPLE  
 #Export all permissions and exclude service accounts for all mailboxes  
-.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAccts "user1@contoso.com","user2@contoso.com" -ExcludeGroups "group1@contoso.com","group2@contoso.com" 
+.\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAcctsCSV "c:\serviceaccts.csv" -ExcludeGroupsCSV "c:\groups.csv"
 
 * EXAMPLE  
 #Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 and 3 to batch users  
@@ -106,5 +96,5 @@ Make sure you have the permissions output file in the same directory (Find-Mailb
 # Contributing
 If you want to contribute and/or provide feedback, please reach out to:
 
-Alejandro Lopez - Alejanl@microsoft.com
+Alejandro Lopez - Alejanl@microsoft.com  
 Sam Portelli - Sam.Portelli@microsoft.com
