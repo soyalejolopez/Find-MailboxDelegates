@@ -132,6 +132,9 @@ param(
 
 Begin{
     try{
+        $WarningPreference = "SilentlyContinue"
+        $ErrorActionPreference = "SilentlyContinue"
+
         ""
         Write-Host "Pre-Flight Check" -ForegroundColor Green
         
@@ -177,7 +180,9 @@ Begin{
                 )
 
                 try{
+                    $Error.Clear()
                     #Variables
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $UserEmail"
                     $CollectPermissions = New-Object System.Collections.Generic.List[System.Object] 
                     $Mailbox = Get-mailbox $UserEmail
 
@@ -195,15 +200,15 @@ Begin{
                     #>
             
                     If($gathercalendar -eq $true){
-	                    $CalendarPermission = Get-MailboxFolderPermission -Identity ($Mailbox.alias + ':\Calendar') -ErrorAction 'SilentlyContinue' | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
+	                    $CalendarPermission = Get-MailboxFolderPermission -Identity ($Mailbox.alias + ':\Calendar') -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
 	                    if (!$CalendarPermission){
-                            $Calendar = (($Mailbox.PrimarySmtpAddress.ToString())+ ":\" + (Get-MailboxFolderStatistics -Identity $Mailbox.DistinguishedName | where-object {$_.FolderType -eq "Calendar"} | Select-Object -First 1).Name)
-                            $CalendarPermission = Get-MailboxFolderPermission -Identity $Calendar -ErrorAction 'SilentlyContinue' | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
+                            $Calendar = (($Mailbox.PrimarySmtpAddress.ToString())+ ":\" + (Get-MailboxFolderStatistics -Identity $Mailbox.DistinguishedName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | where-object {$_.FolderType -eq "Calendar"} | Select-Object -First 1).Name)
+                            $CalendarPermission = Get-MailboxFolderPermission -Identity $Calendar -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
 	                    }
             
                         If($CalendarPermission){
                             Foreach($perm in $CalendarPermission){
-                                $ifGroup = Get-Group -identity $perm.identity.tostring() -ErrorAction SilentlyContinue; $Error.Clear()
+                                $ifGroup = Get-Group -identity $perm.identity.tostring() -ErrorAction SilentlyContinue
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
@@ -251,7 +256,7 @@ Begin{
                 
                         If($FullAccessPermissions){
                             Foreach($perm in $FullAccessPermissions){
-                                $ifGroup = Get-Group -identity $perm.user.tostring() -ErrorAction SilentlyContinue; $Error.Clear()
+                                $ifGroup = Get-Group -identity $perm.user.tostring() -ErrorAction SilentlyContinue 
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
@@ -308,7 +313,7 @@ Begin{
 
                         If($SendAsPermissions){
                             Foreach($perm in $SendAsPermissions){
-                                $ifGroup = Get-Group -identity $perm.tostring() -ErrorAction SilentlyContinue; $Error.Clear()
+                                $ifGroup = Get-Group -identity $perm.tostring() -ErrorAction SilentlyContinue
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($ExcludedGroups -contains $ifGroup.Name)){
@@ -373,7 +378,11 @@ Begin{
                             }
                         }
                     }
-
+                    
+                    If($Error){
+                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$Mailbox.PrimarySMTPAddress : $Error"
+                    }
+                    
                     If($CollectPermissions.Count -eq 0){
                         #write progress to xml file
                         $updateXML = [System.Xml.XmlDocument](Get-Content $ProgressXMLFile)
@@ -403,7 +412,7 @@ Begin{
                         $node.Progress = "Failed"
                     }
                     $updateXML.save($ProgressXMLFile)
-                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText $_ 
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$Mailbox.PrimarySMTPAddress : $_ "
                 }
             }
 
@@ -741,7 +750,7 @@ Begin{
          }   
         }
 
-        Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Completed" -ForegroundColor Green
+        Write-Host "Pre-flight Completed" -ForegroundColor Green
         ""
     }
 
