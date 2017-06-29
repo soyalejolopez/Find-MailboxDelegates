@@ -180,7 +180,6 @@ Begin{
                 )
 
                 try{
-                    $Error.Clear()
                     #Variables
                     Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $UserEmail"
                     $CollectPermissions = New-Object System.Collections.Generic.List[System.Object] 
@@ -200,6 +199,7 @@ Begin{
                     #>
             
                     If($gathercalendar -eq $true){
+                        $Error.Clear()
 	                    $CalendarPermission = Get-MailboxFolderPermission -Identity ($Mailbox.alias + ':\Calendar') -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
 	                    if (!$CalendarPermission){
                             $Calendar = (($Mailbox.PrimarySmtpAddress.ToString())+ ":\" + (Get-MailboxFolderStatistics -Identity $Mailbox.DistinguishedName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | where-object {$_.FolderType -eq "Calendar"} | Select-Object -First 1).Name)
@@ -249,9 +249,13 @@ Begin{
                                 }
                             }
                         }
+                        If($Error){
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check CalendarFolder  : $Error"
+                        }
                     }
 
                     If($gatherfullaccess -eq $true){
+                        $Error.Clear()
                         $FullAccessPermissions = Get-MailboxPermission -Identity ($Mailbox.PrimarySMTPAddress).tostring() | ? {($_.AccessRights -like “*FullAccess*”) -and ($_.IsInherited -eq $false) -and ($_.User -notlike “NT AUTHORITY\SELF”) -and ($_.User -notlike "S-1-5*") -and ($_.User -notlike $Mailbox.PrimarySMTPAddress)}
                 
                         If($FullAccessPermissions){
@@ -297,9 +301,14 @@ Begin{
                                 }
                             }
                         }
+
+                        If($Error){
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check FullAccess  : $Error"
+                        }
                     }
 
                     If($gathersendas -eq $true){
+                        $Error.Clear()
                         #$SendAsPermissions = Get-ADPermission $Mailbox.DistinguishedName | ?{($_.ExtendedRights -like "*send-as*") -and ($_.IsInherited -eq $false) -and -not ($_.User -like "NT AUTHORITY\SELF") }
                 
                         $SendAsPermissions = New-Object System.Collections.Generic.List[System.Object] 
@@ -354,9 +363,14 @@ Begin{
                                 }
                             }    
                         }
+
+                        If($Error){
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendAs  : $Error"
+                        }
                     }
 
                     If($gatherSendOnBehalfTo -eq $true){
+                        $Error.Clear()
                         $GrantSendOnBehalfToPermissions = $Mailbox.grantsendonbehalfto.ToArray()
 
                         If($GrantSendOnBehalfToPermissions){
@@ -377,11 +391,13 @@ Begin{
                                 }
                             }
                         }
+                        
+                        If($Error){
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendOnBehalfTo  : $Error"
+                        }
                     }
                     
-                    If($Error){
-                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$Mailbox.PrimarySMTPAddress : $Error"
-                    }
+                    
                     
                     If($CollectPermissions.Count -eq 0){
                         #write progress to xml file
