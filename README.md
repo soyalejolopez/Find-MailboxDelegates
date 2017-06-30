@@ -6,7 +6,7 @@ This script was developed to assist customers with their exchange hybrid migrati
 
 ## Applies To
 * Exchange 2010
-v* Exchange 2013
+* Exchange 2013
 
 ## Pre-requisites
 * Powershell v3+
@@ -16,9 +16,9 @@ THIS CODE IS PROVIDED AS IS WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPL
 
 # How it works
 ## High level steps
-s1. Collect permissions 
-1. Find batches based on the output permissions
-1. Create migration schedule (this is built in the format required by the Microsoft FastTrack Mail Migration team)
+1. Collect permissions 
+2. Find batches based on the output permissions
+3. Create migration schedule (this is built in the format required by the Microsoft FastTrack Mail Migration team)
 
 ## Available switches and examples
 * PARAMETER InputMailboxesCSV  
