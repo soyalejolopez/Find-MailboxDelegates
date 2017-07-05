@@ -200,15 +200,15 @@ Begin{
             
                     If($gathercalendar -eq $true){
                         $Error.Clear()
-	                    $CalendarPermission = Get-MailboxFolderPermission -Identity ($Mailbox.alias + ':\Calendar') -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
+	                    $CalendarPermission = Get-MailboxFolderPermission -Identity ($Mailbox.alias + ':\Calendar') -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select User, AccessRights
 	                    if (!$CalendarPermission){
                             $Calendar = (($Mailbox.PrimarySmtpAddress.ToString())+ ":\" + (Get-MailboxFolderStatistics -Identity $Mailbox.DistinguishedName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | where-object {$_.FolderType -eq "Calendar"} | Select-Object -First 1).Name)
-                            $CalendarPermission = Get-MailboxFolderPermission -Identity $Calendar -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
+                            $CalendarPermission = Get-MailboxFolderPermission -Identity $Calendar -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select User, AccessRights
 	                    }
             
                         If($CalendarPermission){
                             Foreach($perm in $CalendarPermission){
-                                $ifGroup = Get-Group -identity $perm.identity.tostring() -ErrorAction SilentlyContinue
+                                $ifGroup = Get-Group -identity $perm.User.ADRecipient.Identity.tostring() -ErrorAction SilentlyContinue
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
@@ -232,7 +232,7 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.Identity.tostring() 
+                                    $delegate = Get-Recipient -Identity $perm.User.ADRecipient.Identity.tostring() 
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
