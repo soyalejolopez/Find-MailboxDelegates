@@ -32,8 +32,6 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Published date: 06/15/2017
-
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
 Sam Portelli - Sam.Portelli@microsoft.com
@@ -136,13 +134,14 @@ Begin{
         $ErrorActionPreference = "SilentlyContinue"
 
         ""
-        Write-Host "Pre-Flight Check" -ForegroundColor Green
+        Write-Host "Pre-flight Check" -ForegroundColor Green
         
         #Requirement is Powershell V3 in order to use PSCustomObjets which are data structures
-        If($host.version.major -lt 3){
-            throw "Powershell V3+ is required."
+        If($PSVersionTable.PSVersion.Major -lt 3){
+            throw "Powershell V3+ is required. If you're running from Exchange Shell, it may be defaulting to PS2.0. Run 'powershell -version 3' and re-run the script."
         }
 
+        #Check switches provided are acceptable
         If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume)){
             throw "BatchUsers can't be combined with these other switches."
         }
@@ -180,6 +179,8 @@ Begin{
                 )
 
                 try{
+                    
+
                     #Variables
                     Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $UserEmail"
                     $CollectPermissions = New-Object System.Collections.Generic.List[System.Object] 
@@ -212,6 +213,7 @@ Begin{
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
+                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : Enumerate Group $($ifGroup.distinguishedName)"
 					                        $dsLookFor.Filter = "(&(memberof:1.2.840.113556.1.4.1941:=$($ifGroup.distinguishedName))(objectCategory=user))" 
 	                                        $dsLookFor.PageSize  = 1000
 	                                        $dsLookFor.SearchScope = "subtree" 
@@ -221,10 +223,12 @@ Begin{
                                                 $usrTmpEmail = $usrTmp.Properties["mail"]
                                                 If($ExcludedServiceAccts){
                                                     if(-not ($ExcludedServiceAccts -contains $usrTmpEmail[0] -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($usrTmpEmail[0])"
                                                         $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Calendar Folder"})
                                                     }
                                                 }
                                                 Else{
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($usrTmpEmail[0])"
                                                     $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Calendar Folder"})
                                                 }
 	                                        }
@@ -232,16 +236,18 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.Identity.tostring() 
+                                    $delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") 
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
                                             If($ExcludedServiceAccts){
                                                 if(-not ($ExcludedServiceAccts -contains $delegate.primarySMTPAddress.tostring() -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($delegate.primarySMTPAddress.ToString())"
                                                     $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Calendar Folder"})
                                                 }
                                             }
                                             Else{
+                                                Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($delegate.primarySMTPAddress.ToString())"
                                                 $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Calendar Folder"})
                                             }
                                         }
@@ -264,6 +270,7 @@ Begin{
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
+                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : Enumerate Group $($ifGroup.distinguishedName)"
 					                        $dsLookFor.Filter = "(&(memberof:1.2.840.113556.1.4.1941:=$($ifGroup.distinguishedName))(objectCategory=user))" 
 	                                        $dsLookFor.PageSize  = 1000
 	                                        $dsLookFor.SearchScope = "subtree" 
@@ -273,10 +280,12 @@ Begin{
                                                 $usrTmpEmail = $usrTmp.Properties["mail"]
                                                 If($ExcludedServiceAccts){
                                                     if(-not ($ExcludedServiceAccts -contains $usrTmpEmail[0] -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($usrTmpEmail[0])"
                                                         $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Full Access"})
                                                     }
                                                 }
                                                 Else{
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($usrTmpEmail[0])"
                                                     $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Full Access"})
                                                 }
 	                                        }
@@ -290,10 +299,12 @@ Begin{
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
                                             If($ExcludedServiceAccts){
                                                 if(-not ($ExcludedServiceAccts -contains $delegate.primarySMTPAddress.tostring() -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($delegate.primarySMTPAddress.ToString())"
                                                     $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Full Access"})
                                                 }
                                             }
                                             Else{
+                                                Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($delegate.primarySMTPAddress.ToString())"
                                                 $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Full Access"})
                                             }
                                         }
@@ -303,7 +314,7 @@ Begin{
                         }
 
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check FullAccess  : $Error"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check FullAccess : $Error"
                         }
                     }
 
@@ -326,7 +337,8 @@ Begin{
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($ExcludedGroups -contains $ifGroup.Name)){
-					                        $dsLookFor.Filter = "(&(memberof:1.2.840.113556.1.4.1941:=$($ifGroup.distinguishedName))(objectCategory=user))" 
+                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : Enumerate Group $($ifGroup.distinguishedName)"
+                                            $dsLookFor.Filter = "(&(memberof:1.2.840.113556.1.4.1941:=$($ifGroup.distinguishedName))(objectCategory=user))" 
 	                                        $dsLookFor.PageSize  = 1000
 	                                        $dsLookFor.SearchScope = "subtree" 
 	                                        $mail = $dsLookFor.PropertiesToLoad.Add("mail")
@@ -335,10 +347,12 @@ Begin{
                                                 $usrTmpEmail = $usrTmp.Properties["mail"]
                                                 If($ExcludedServiceAccts){
                                                     if(-not ($ExcludedServiceAccts -contains $usrTmpEmail[0] -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($usrTmpEmail[0])"
                                                         $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Send As"})
                                                     }
                                                 }
                                                 Else{
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($usrTmpEmail[0])"
                                                     $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Send As"})
                                                 }
 	                                        }
@@ -352,10 +366,12 @@ Begin{
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
 								            If($ExcludedServiceAccts){
                                                 if(-not ($ExcludedServiceAccts -contains $delegate.primarySMTPAddress.tostring() -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($delegate.primarySMTPAddress.ToString())"
                                                     $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Send As"})
                                                 }
                                             }
                                             Else{
+                                                Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($delegate.primarySMTPAddress.ToString())"
                                                 $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Send As"})
                                             }
                                         }
@@ -381,11 +397,13 @@ Begin{
 							        If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
                                         If($ExcludedServiceAccts){
                                             if(-not ($ExcludedServiceAccts -contains $delegate.primarySMTPAddress.tostring() -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
-                                                $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "GrantSendOnBehalfTo"})
+                                                Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendOnBehalfTo : $($delegate.primarySMTPAddress.ToString())"
+                                                $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "SendOnBehalfTo"})
                                             }
                                         }
                                         Else{
-                                            $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "GrantSendOnBehalfTo"})
+                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendOnBehalfTo : $($delegate.primarySMTPAddress.ToString())"
+                                            $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "SendOnBehalfTo"})
                                         }
                                     }
                                 }
@@ -428,7 +446,7 @@ Begin{
                         $node.Progress = "Failed"
                     }
                     $updateXML.save($ProgressXMLFile)
-                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$Mailbox.PrimarySMTPAddress : $_ "
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Error: $($Mailbox.PrimarySMTPAddress) : $_ "
                 }
             }
 
@@ -607,7 +625,7 @@ Begin{
                 }
             }
 
-        If($ExchServerFQDN -ne ""){
+        If($ExchServerFQDN){
             try{
                 ""
                 #If want to save creds without having to enter password into Get-Credential every time
@@ -615,12 +633,14 @@ Begin{
                 #$username = "administrator@contoso.com" 
                 #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
 
-                $ExchServerFQDN = "$env:computername.$env:userdnsdomain"
-                $Creds = Get-Credential -Message "This account will be used to connect to exchange on premises"
-	            $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
+                #$ExchServerFQDN = "$env:computername.$env:userdnsdomain"
+	            $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
                 If(!$session){
-                    $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
+                    $Creds = Get-Credential -Message "Unable to connect using current credentials. Enter account credentials that has permissions to connect to Exchange"
                     $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
+                    If(!$session){
+                        throw
+                    }
                 }
 	            $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
             }
@@ -642,11 +662,14 @@ Begin{
                     #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
 
                     $ExchServerFQDN = "$env:computername.$env:userdnsdomain"
-                    $Creds = Get-Credential -Message "This account will be used to connect to exchange on premises"
-	                $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
+	                $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
                     If(!$session){
                         $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
+                        $Creds = Get-Credential -Message "Enter credentials to connect to exchange on premises"
                         $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
+                        If(!$session){
+                            throw
+                        }
                     }
 	                $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
                 }
@@ -677,6 +700,9 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
+
+        #Set scope to find objects in other domains
+        Set-AdServerSettings -ViewEntireForest $True
 
         #Get Mailboxes
         If($Resume){
@@ -771,7 +797,7 @@ Begin{
     }
 
     catch{
-        Write-Host "Pre-flight failed: $_" -ForegroundColor Red
+        Write-Host "Pre-flight Failed: $_" -ForegroundColor Red
         If($session){
             Remove-PSSession $Session
         }
@@ -809,4 +835,3 @@ End{
     Write-LogEntry -LogName:$LogFile -LogEntryText "Results: $($scriptPath)"  -ForegroundColor Green
     Write-LogEntry -LogName:$LogFile -LogEntryText "Total Elapsed Time: $($elapsed.Elapsed.ToString())"  -ForegroundColor Green
 }
-
