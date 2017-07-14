@@ -162,7 +162,7 @@ Begin{
             $error.Clear()
             try
             { 
-                $del=Get-Recipient -Identity $recipient -ErrorAction silentlyContinue
+                $del=Get-Recipient -Identity $recipient -ErrorAction stop
             }
             catch 
             {
@@ -171,7 +171,7 @@ Begin{
                    $external = $Script:mailboxesLookup | where {$_.linkedmasteraccount -eq $recipient}
 
                    if ($external) {
-                        $del = Get-Recipient -Identity ($external) -ErrorAction SilentlyContinue
+                        $del = Get-Recipient -Identity $external.identity.tostring() -ErrorAction silentlyContinue
                         if ($del) {return $del}
                         else 
                         {
@@ -187,6 +187,7 @@ Begin{
                 }
         
             }
+            return $del
         }
 
         Function Get-Permissions(){
@@ -318,7 +319,7 @@ Begin{
                                 }
                                 Else{
                                     #$delegate = Get-Recipient -Identity $perm.user.tostring() -ErrorAction SilentlyContinue
-                                    $delegate = Get-RecipientCustom $perm.Identity.tostring()
+                                    $delegate = Get-RecipientCustom $perm.user.tostring()
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -386,7 +387,7 @@ Begin{
                                 }
                                 Else{
                                     #$delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
-                                    $delegate = Get-RecipientCustom $perm.Identity.tostring()
+                                    $delegate = Get-RecipientCustom $perm.tostring()
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -418,7 +419,7 @@ Begin{
                         If($GrantSendOnBehalfToPermissions){
                             Foreach($perm in $GrantSendOnBehalfToPermissions){
                                 #$delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
-                                $delegate = Get-RecipientCustom $perm.Identity.tostring()
+                                $delegate = Get-RecipientCustom $perm.tostring()
                         
                                 If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							        If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -632,8 +633,19 @@ Begin{
 		   
                        If(![string]::IsNullOrEmpty($user.WindowsEmailAddress)){
 			                $mbStats = Get-MailboxStatistics $user.WindowsEmailAddress.tostring() | select totalitemsize
-			                If($mbStats.totalitemsize.value){
-                                $mailboxSize =  $mbStats.totalitemsize.value.ToMb()
+			                If($mbStats.totalitemsize.value)
+                            {
+                                #if connecting through remote pshell, and not using Exo server shell, the data comes as 
+                                #TypeName: Deserialized.Microsoft.Exchange.Data.ByteQuantifiedSize
+                                if ( ($mbStats.TotalItemSize.Value.GetType()).name.ToString() -eq "ByteQuantifiedSize")
+                                {
+                                    $mailboxSize =  $mbStats.totalitemsize.value.ToMb()
+                                }
+                                else
+                                {
+                                    $mailboxSize =  $mbStats.TotalItemSize.Value.ToString().split("(")[1].split(" ")[0].replace(",","")/1024/1024
+                                }
+                                
 			                }
 			                Else{
                                 $mailboxSize = 0
