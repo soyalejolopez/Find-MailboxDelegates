@@ -32,6 +32,8 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
+Version: 07142017
+
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
 Sam Portelli - Sam.Portelli@microsoft.com
@@ -130,24 +132,6 @@ param(
 
 Begin{
     try{
-        $WarningPreference = "SilentlyContinue"
-        $ErrorActionPreference = "SilentlyContinue"
-
-        ""
-        Write-Host "Pre-flight Check" -ForegroundColor Green
-        
-        #Requirement is Powershell V3 in order to use PSCustomObjets which are data structures
-        If($PSVersionTable.PSVersion.Major -lt 3){
-            throw "Powershell V3+ is required. If you're running from Exchange Shell, it may be defaulting to PS2.0. Run 'powershell -version 3' and re-run the script."
-        }
-
-        #Check switches provided are acceptable
-        If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume)){
-            throw "BatchUsers can't be combined with these other switches."
-        }
-        If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers){
-            throw "Include the switches for the permissions you want to query on. Check the read me file for more details."
-        }
 
         #Load functions
         Function Write-LogEntry {
@@ -236,7 +220,7 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") 
+                                    $delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -293,7 +277,7 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.user.tostring() 
+                                    $delegate = Get-Recipient -Identity $perm.user.tostring() -ErrorAction SilentlyContinue
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -360,7 +344,7 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.tostring()
+                                    $delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -391,7 +375,7 @@ Begin{
 
                         If($GrantSendOnBehalfToPermissions){
                             Foreach($perm in $GrantSendOnBehalfToPermissions){
-                                $delegate = Get-Recipient -Identity $perm.tostring() 
+                                $delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
                         
                                 If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							        If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -625,6 +609,40 @@ Begin{
                 }
             }
 
+        #Script Variables
+        $elapsed = [System.Diagnostics.Stopwatch]::StartNew()
+        $scriptPath = $PSScriptRoot
+        $yyyyMMdd = Get-Date -Format 'yyyyMMdd'
+        $LogFile = "$scriptPath\Find-MailboxDelegates-$yyyyMMdd.log"
+        $PermsOutputFile = "$scriptPath\Find-MailboxDelegates-Permissions.csv"
+        $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
+        $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
+        $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
+        $Version = "07142017"
+        $computer = $env:COMPUTERNAME
+        $user = $env:USERNAME
+
+        $WarningPreference = "SilentlyContinue"
+        $ErrorActionPreference = "SilentlyContinue"
+
+        ""
+        Write-LogEntry -LogName:$LogFile -LogEntryText "User: $user Computer: $computer Version: $Version" -foregroundcolor Yellow
+        ""
+        Write-Host "Pre-flight Check" -ForegroundColor Green
+        
+        #Requirement is Powershell V3 in order to use PSCustomObjets which are data structures
+        If($PSVersionTable.PSVersion.Major -lt 3){
+            throw "Powershell V3+ is required. If you're running from Exchange Shell, it may be defaulting to PS2.0. Run 'powershell -version 3' and re-run the script."
+        }
+
+        #Check switches provided are acceptable
+        If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume)){
+            throw "BatchUsers can't be combined with these other switches."
+        }
+        If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers){
+            throw "Include the switches for the permissions you want to query on. Check the read me file for more details."
+        }
+        
         If($ExchServerFQDN){
             try{
                 ""
@@ -690,16 +708,6 @@ Begin{
             $permission = "Send As"
             $right = $ext.psbase.Children | ? { $_.DisplayName -eq $permission }
         }
-
-        #Script Variables
-        $elapsed = [System.Diagnostics.Stopwatch]::StartNew()
-        $scriptPath = $PSScriptRoot
-        $yyyyMMdd = Get-Date -Format 'yyyyMMdd'
-        $LogFile = "$scriptPath\Find-MailboxDelegates-$yyyyMMdd.log"
-        $PermsOutputFile = "$scriptPath\Find-MailboxDelegates-Permissions.csv"
-        $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
-        $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
-        $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
 
         #Set scope to find objects in other domains
         Set-AdServerSettings -ViewEntireForest $True
