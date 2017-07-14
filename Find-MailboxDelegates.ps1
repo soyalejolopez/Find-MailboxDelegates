@@ -628,7 +628,9 @@ Begin{
         ""
         Write-LogEntry -LogName:$LogFile -LogEntryText "User: $user Computer: $computer Version: $Version" -foregroundcolor Yellow
         ""
-        Write-Host "Pre-flight Check" -ForegroundColor Green
+        Write-LogEntry -LogName:$LogFile -LogEntryText "Script parameters passed: $($PSBoundParameters.GetEnumerator())" 
+        ""
+        Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Check" -ForegroundColor Green 
         
         #Requirement is Powershell V3 in order to use PSCustomObjets which are data structures
         If($PSVersionTable.PSVersion.Major -lt 3){
@@ -800,12 +802,12 @@ Begin{
          }   
         }
 
-        Write-Host "Pre-flight Completed" -ForegroundColor Green
+        Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Completed" -ForegroundColor Green 
         ""
     }
 
     catch{
-        Write-Host "Pre-flight Failed: $_" -ForegroundColor Red
+        Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Failed: $_" -ForegroundColor Red 
         If($session){
             Remove-PSSession $Session
         }
