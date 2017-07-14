@@ -168,7 +168,10 @@ Begin{
                     #Variables
                     Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $UserEmail"
                     $CollectPermissions = New-Object System.Collections.Generic.List[System.Object] 
-                    $Mailbox = Get-mailbox $UserEmail
+                    $Mailbox = Get-mailbox $UserEmail -EA SilentlyContinue
+                    If(!$Mailbox){
+                        throw "Problem getting mailbox for $UserEmail : $_" 
+                    }
 
                     #Enumerate Groups/Send As - moving this part outside of the function for faster processing
                     <#
@@ -441,8 +444,13 @@ Begin{
 		
                 #Variables
                 If(-not (Test-Path $InputPermissionsFile)){
-                    throw [System.IO.FileNotFoundException] "$($InputPermissionsFile) file not found."
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($InputPermissionsFile) file not found. Check the log file for more info: $LogFile" -ForegroundColor Red
+                    exit 
                 }
+                If((get-childitem $InputPermissionsFile).length -eq 0 ){
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "The permissions file is empty. Check the log file for more info: $LogFile" -ForegroundColor Red
+                    exit 
+                }
                 Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Run function: Create-Batches" -ForegroundColor White 
     
                 $data = import-csv $InputPermissionsFile
