@@ -150,6 +150,45 @@ Begin{
                }
             }
 
+        <# 
+            Perform a fail safe Get-Recipient to handle resource forest model where the users permissions are assigned to domain\user in the account
+            forest, that is not resolvable in the Resource domain. Upon get-recipient failure it will try to find a mailbox with the linkedMasterAccount
+            associate, and use it as reference for batch grouping
+        #>
+        Function Get-RecipientCustom{
+            param(
+                [string]$recipient
+            )
+            $error.Clear()
+            try
+            { 
+                $del=Get-Recipient -Identity $recipient -ErrorAction silentlyContinue
+            }
+            catch 
+            {
+                if ( $error[0].Exception.ToString() -like "*The operation couldn't be performed because object*couldn't be found on*")
+                {
+                   $external = $Script:mailboxesLookup | where {$_.linkedmasteraccount -eq $recipient}
+
+                   if ($external) {
+                        $del = Get-Recipient -Identity ($external) -ErrorAction SilentlyContinue
+                        if ($del) {return $del}
+                        else 
+                        {
+                            Write-Host "Found external linked account $recipient associated to $($external.identity) mailbox, but cannot get the Recipient" -ForegroundColor red
+                            return $null
+                        }
+                   }
+                   Else
+                   {
+                        Write-Host "Looks like $recipient is not here!" -ForegroundColor red
+                        return $null
+                   }
+                }
+        
+            }
+        }
+
         Function Get-Permissions(){
 	            param(
                     [string]$UserEmail,
@@ -220,8 +259,9 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
-                        
+                                    #$delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
+                                    $delegate = Get-RecipientCustom $perm.Identity.tostring().replace(":\Calendar","")
+
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
                                             If($ExcludedServiceAccts){
@@ -277,7 +317,8 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.user.tostring() -ErrorAction SilentlyContinue
+                                    #$delegate = Get-Recipient -Identity $perm.user.tostring() -ErrorAction SilentlyContinue
+                                    $delegate = Get-RecipientCustom $perm.Identity.tostring()
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -344,7 +385,8 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                    #$delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                    $delegate = Get-RecipientCustom $perm.Identity.tostring()
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -375,7 +417,8 @@ Begin{
 
                         If($GrantSendOnBehalfToPermissions){
                             Foreach($perm in $GrantSendOnBehalfToPermissions){
-                                $delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                #$delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                $delegate = Get-RecipientCustom $perm.Identity.tostring()
                         
                                 If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							        If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -713,6 +756,9 @@ Begin{
 
         #Set scope to find objects in other domains
         Set-AdServerSettings -ViewEntireForest $True
+
+        Write-Host "Creating Mailboxes lookup table"
+        $Script:mailboxesLookup = Get-Mailbox -ResultSize Unlimited
 
         #Get Mailboxes
         If($Resume){
