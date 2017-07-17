@@ -150,6 +150,46 @@ Begin{
                }
             }
 
+        <# 
+            Perform a fail safe Get-Recipient to handle resource forest model where the users permissions are assigned to domain\user in the account
+            forest, that is not resolvable in the Resource domain. Upon get-recipient failure it will try to find a mailbox with the linkedMasterAccount
+            associate, and use it as reference for batch grouping
+        #>
+        Function Get-RecipientCustom{
+            param(
+                [string]$recipient
+            )
+            $error.Clear()
+            try
+            { 
+                $del=Get-Recipient -Identity $recipient -ErrorAction stop
+            }
+            catch 
+            {
+                if ( $error[0].Exception.ToString() -like "*The operation couldn't be performed because object*couldn't be found on*")
+                {
+                   $external = $Script:mailboxesLookup | where {$_.linkedmasteraccount -eq $recipient}
+
+                   if ($external) {
+                        $del = Get-Recipient -Identity $external.identity.tostring() -ErrorAction silentlyContinue
+                        if ($del) {return $del}
+                        else 
+                        {
+                            Write-Host "Found external linked account $recipient associated to $($external.identity) mailbox, but cannot get the Recipient" -ForegroundColor red
+                            return $null
+                        }
+                   }
+                   Else
+                   {
+                        Write-Host "Looks like $recipient is not here!" -ForegroundColor red
+                        return $null
+                   }
+                }
+        
+            }
+            return $del
+        }
+
         Function Get-Permissions(){
 	            param(
                     [string]$UserEmail,
@@ -223,8 +263,9 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
-                        
+                                    #$delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
+                                    $delegate = Get-RecipientCustom $perm.Identity.tostring().replace(":\Calendar","")
+
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
                                             If($ExcludedServiceAccts){
@@ -280,7 +321,8 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.user.tostring() -ErrorAction SilentlyContinue
+                                    #$delegate = Get-Recipient -Identity $perm.user.tostring() -ErrorAction SilentlyContinue
+                                    $delegate = Get-RecipientCustom $perm.user.tostring()
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -347,7 +389,8 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    $delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                    #$delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                    $delegate = Get-RecipientCustom $perm.tostring()
                         
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -378,7 +421,8 @@ Begin{
 
                         If($GrantSendOnBehalfToPermissions){
                             Foreach($perm in $GrantSendOnBehalfToPermissions){
-                                $delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                #$delegate = Get-Recipient -Identity $perm.tostring() -ErrorAction SilentlyContinue
+                                $delegate = Get-RecipientCustom $perm.tostring()
                         
                                 If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							        If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -597,8 +641,19 @@ Begin{
 		   
                        If(![string]::IsNullOrEmpty($user.WindowsEmailAddress)){
 			                $mbStats = Get-MailboxStatistics $user.WindowsEmailAddress.tostring() | select totalitemsize
-			                If($mbStats.totalitemsize.value){
-                                $mailboxSize =  $mbStats.totalitemsize.value.ToMb()
+			                If($mbStats.totalitemsize.value)
+                            {
+                                #if connecting through remote pshell, and not using Exo server shell, the data comes as 
+                                #TypeName: Deserialized.Microsoft.Exchange.Data.ByteQuantifiedSize
+                                if ( ($mbStats.TotalItemSize.Value.GetType()).name.ToString() -eq "ByteQuantifiedSize")
+                                {
+                                    $mailboxSize =  $mbStats.totalitemsize.value.ToMb()
+                                }
+                                else
+                                {
+                                    $mailboxSize =  $mbStats.TotalItemSize.Value.ToString().split("(")[1].split(" ")[0].replace(",","")/1024/1024
+                                }
+                                
 			                }
 			                Else{
                                 $mailboxSize = 0
@@ -721,6 +776,9 @@ Begin{
 
         #Set scope to find objects in other domains
         Set-AdServerSettings -ViewEntireForest $True
+
+        Write-Host "Creating Mailboxes lookup table"
+        $Script:mailboxesLookup = Get-Mailbox -ResultSize Unlimited
 
         #Get Mailboxes
         If($Resume){
