@@ -32,11 +32,14 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 07142017
+Version: 07172017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
 Sam Portelli - Sam.Portelli@microsoft.com
+
+Contributors:
+Francesco Poli - Francesco.Poli@microsoft.com
 =========================================
 
 .PARAMETER InputMailboxesCSV
@@ -133,7 +136,7 @@ param(
 Begin{
     try{
 
-        #Load functions
+        #region functions
         Function Write-LogEntry {
                param(
                   [string] $LogName ,
@@ -150,7 +153,7 @@ Begin{
                }
             }
 
-        <# 
+        <# Get-RecipientCustom
             Perform a fail safe Get-Recipient to handle resource forest model where the users permissions are assigned to domain\user in the account
             forest, that is not resolvable in the Resource domain. Upon get-recipient failure it will try to find a mailbox with the linkedMasterAccount
             associate, and use it as reference for batch grouping
@@ -208,7 +211,10 @@ Begin{
                     #Variables
                     Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $UserEmail"
                     $CollectPermissions = New-Object System.Collections.Generic.List[System.Object] 
-                    $Mailbox = Get-mailbox $UserEmail
+                    $Mailbox = Get-mailbox $UserEmail -EA SilentlyContinue
+                    If(!$Mailbox){
+                        throw "Problem getting mailbox for $UserEmail : $_" 
+                    }
 
                     #Enumerate Groups/Send As - moving this part outside of the function for faster processing
                     <#
@@ -225,15 +231,15 @@ Begin{
             
                     If($gathercalendar -eq $true){
                         $Error.Clear()
-	                    $CalendarPermission = Get-MailboxFolderPermission -Identity ($Mailbox.alias + ':\Calendar') -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
+	                    $CalendarPermission = Get-MailboxFolderPermission -Identity ($Mailbox.alias + ':\Calendar') -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select User, AccessRights
 	                    if (!$CalendarPermission){
                             $Calendar = (($Mailbox.PrimarySmtpAddress.ToString())+ ":\" + (Get-MailboxFolderStatistics -Identity $Mailbox.DistinguishedName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | where-object {$_.FolderType -eq "Calendar"} | Select-Object -First 1).Name)
-                            $CalendarPermission = Get-MailboxFolderPermission -Identity $Calendar -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select Identity, AccessRights
+                            $CalendarPermission = Get-MailboxFolderPermission -Identity $Calendar -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | ?{$_.User -notlike "Anonymous" -and $_.User -notlike "Default"} | Select User, AccessRights
 	                    }
             
                         If($CalendarPermission){
                             Foreach($perm in $CalendarPermission){
-                                $ifGroup = Get-Group -identity $perm.identity.tostring() -ErrorAction SilentlyContinue
+                                $ifGroup = Get-Group -identity $perm.user.tostring() -ErrorAction SilentlyContinue
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
@@ -260,8 +266,8 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    #$delegate = Get-Recipient -Identity $perm.Identity.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
-                                    $delegate = Get-RecipientCustom $perm.Identity.tostring().replace(":\Calendar","")
+                                    #$delegate = Get-Recipient -Identity $perm.user.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
+                                    $delegate = Get-RecipientCustom $perm.user.adrecipient.primarysmtpaddress.tostring().replace(":\Calendar","")
 
                                     If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
 							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
@@ -478,6 +484,84 @@ Begin{
                 }
             }
 
+        Function ConnectTo-Exchange ($ExchServerFQDN) {
+            #Connect to Exchange
+            if (Test-Path $env:ExchangeInstallPath\bin\RemoteExchange.ps1){
+	            . $env:ExchangeInstallPath\bin\RemoteExchange.ps1 | out-null
+                
+	            If(!$ExchServerFQDN){
+                    Connect-ExchangeServer -auto -AllowClobber | Out-Null
+                }
+                Else{
+                    Connect-ExchangeServer -serverfqdn $ExchServerFQDN -AllowClobber | Out-Null
+                }
+            }
+            else{
+                Write-LogEntry -LogName:$LogFile -LogEntryText "Exchange Server management tools are not installed on this computer." -ForegroundColor Red 
+                EXIT
+            }
+
+            #Method #2 to connect using remote powershell
+            <#
+                If($ExchServerFQDN){
+                    try{
+                        ""
+                        #If want to save creds without having to enter password into Get-Credential every time
+                        #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
+                        #$username = "administrator@contoso.com" 
+                        #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
+
+                        #$ExchServerFQDN = "$env:computername.$env:userdnsdomain"
+	                    $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
+                        If(!$session){
+                            $Creds = Get-Credential -Message "Unable to connect using current credentials. Enter account credentials that has permissions to connect to Exchange"
+                            $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
+                            If(!$session){
+                                throw
+                            }
+                        }
+	                    $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
+                    }
+                    catch{
+                        throw "Unable to establish a session with the Exchange Server: $($ExchServerFQDN)"
+                        exit
+                    }
+                }
+                Else{
+                    #check if a session already exists
+                    $error.clear()
+                    get-command get-mailbox -ErrorAction SilentlyContinue | out-null
+                    If($error){
+                        try{
+                            ""
+                            #If want to save creds without having to enter password into Get-Credential every time
+                            #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
+                            #$username = "administrator@contoso.com" 
+                            #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
+
+                            $ExchServerFQDN = "$env:computername.$env:userdnsdomain"
+	                        $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
+                            If(!$session){
+                                $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
+                                $Creds = Get-Credential -Message "Enter credentials to connect to exchange on premises"
+                                $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
+                                If(!$session){
+                                    throw
+                                }
+                            }
+	                        $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
+                        }
+                        catch{
+                            throw "Unable to establish a session with the Exchange Server: $($ExchServerFQDN)"
+                            exit
+                        }
+                    }
+                }
+
+            #>
+
+        }
+        
         Function Create-Batches(){
                 param(
                     [string]$InputPermissionsFile
@@ -485,8 +569,13 @@ Begin{
 		
                 #Variables
                 If(-not (Test-Path $InputPermissionsFile)){
-                    throw [System.IO.FileNotFoundException] "$($InputPermissionsFile) file not found."
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($InputPermissionsFile) file not found. Check the log file for more info: $LogFile" -ForegroundColor Red
+                    exit 
                 }
+                If((get-childitem $InputPermissionsFile).length -eq 0 ){
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "The permissions file is empty. Check the log file for more info: $LogFile" -ForegroundColor Red
+                    exit 
+                }
                 Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Run function: Create-Batches" -ForegroundColor White 
     
                 $data = import-csv $InputPermissionsFile
@@ -664,6 +753,8 @@ Begin{
                 }
             }
 
+        #endregion functions
+
         #Script Variables
         $elapsed = [System.Diagnostics.Stopwatch]::StartNew()
         $scriptPath = $PSScriptRoot
@@ -673,7 +764,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "07142017"
+        $Version = "07172017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
@@ -699,62 +790,14 @@ Begin{
         If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers){
             throw "Include the switches for the permissions you want to query on. Check the read me file for more details."
         }
+
+        $testSession = get-command get-mailbox -ErrorAction SilentlyContinue
+        If(!$testSession){
+            Write-LogEntry -LogName:$LogFile -LogEntryText "Didn't find an active exchange session. Initiating..." -ForegroundColor Gray 
+            ConnectTo-Exchange $ExchServerFQDN | Out-Null
+            ""
+        }
         
-        If($ExchServerFQDN){
-            try{
-                ""
-                #If want to save creds without having to enter password into Get-Credential every time
-                #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
-                #$username = "administrator@contoso.com" 
-                #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
-
-                #$ExchServerFQDN = "$env:computername.$env:userdnsdomain"
-	            $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
-                If(!$session){
-                    $Creds = Get-Credential -Message "Unable to connect using current credentials. Enter account credentials that has permissions to connect to Exchange"
-                    $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
-                    If(!$session){
-                        throw
-                    }
-                }
-	            $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
-            }
-            catch{
-                throw "Unable to establish a session with the Exchange Server: $($ExchServerFQDN)"
-                exit
-            }
-        }
-        Else{
-            #check if a session already exists
-            $error.clear()
-            get-command get-mailbox -ErrorAction SilentlyContinue | out-null
-            If($error){
-                try{
-                    ""
-                    #If want to save creds without having to enter password into Get-Credential every time
-                    #$password = "Password" | ConvertTo-SecureString -asPlainText -Force
-                    #$username = "administrator@contoso.com" 
-                    #$Creds = New-Object System.Management.Automation.PSCredential($username,$password)
-
-                    $ExchServerFQDN = "$env:computername.$env:userdnsdomain"
-	                $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -WarningAction 'SilentlyContinue' -ErrorAction SilentlyContinue
-                    If(!$session){
-                        $ExchServerFQDN = Read-host "Type in the FQDN of the Exchange Server to connect to"
-                        $Creds = Get-Credential -Message "Enter credentials to connect to exchange on premises"
-                        $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://$ExchServerFQDN/PowerShell/ -Authentication Kerberos -Credential $Creds -WarningAction 'SilentlyContinue' 
-                        If(!$session){
-                            throw
-                        }
-                    }
-	                $Connect = Import-Module (Import-PSSession $Session -AllowClobber -WarningAction 'SilentlyContinue' -DisableNameChecking) -Global -WarningAction 'SilentlyContinue'
-                }
-                catch{
-                    throw "Unable to establish a session with the Exchange Server: $($ExchServerFQDN)"
-                    exit
-                }
-            }
-        }
-
         #Open connection to AD - this will be used to enumerate groups and collect Send As permissions
         If(($EnumerateGroups -eq $true) -or ($SendAs -eq $true)){ 
             $dse = [ADSI]"LDAP://Rootdse"
@@ -769,7 +812,8 @@ Begin{
         #Set scope to find objects in other domains
         Set-AdServerSettings -ViewEntireForest $True
 
-        Write-Host "Creating Mailboxes lookup table"
+        #Used for Acccount/Resource models
+        Write-LogEntry -LogName:$LogFile -LogEntryText "Creating Mailboxes lookup table" -ForegroundColor Gray 
         $Script:mailboxesLookup = Get-Mailbox -ResultSize Unlimited
 
         #Get Mailboxes
@@ -783,11 +827,11 @@ Begin{
                     throw "Unable to resume due to missing progress file: $($ProgressXMLFile)"
                     exit
                 }
-                }
-                Else{
-                throw "Can't have both 'Resume' and 'InputMailboxesCSV' at the same time. Choose 'Resume' if you want to pick up on where you left off from a previous run."
-                exit
-                }        
+            }
+            Else{
+            throw "Can't have both 'Resume' and 'InputMailboxesCSV' at the same time. Choose 'Resume' if you want to pick up on where you left off from a previous run."
+            exit
+            }        
         }
         ElseIf(!$Batchusers){
             If($InputMailboxesCSV -ne ""){
@@ -816,7 +860,7 @@ Begin{
                 $xmlDoc.save($ProgressXMLFile)
             }
             Else{
-                $ListOfMailboxes = Get-Mailbox -ResultSize Unlimited | select PrimarySMTPAddress
+                $ListOfMailboxes = $mailboxesLookup | select PrimarySMTPAddress
 
                 #write to xml for progress tracking
                 [xml]$xmlDoc = New-Object System.Xml.XmlDocument

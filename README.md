@@ -1,3 +1,4 @@
+
 # Find-MailboxDelegates
 ## Summary
 Migrating to Exchange Online (EXO) using Exchange Hybrid? Make sure to migrate mailboxes with the same manager or delegate (associated delegates) in the same batch otherwise their access to each other's mailbox will be broken. This is because Send-As, Receive-As, or Send on behalf cross premises permissions are not supported with Exchange hybrid environments. You can read all about it here: https://technet.microsoft.com/en-us/library/jj906433(v=exchg.150).aspx
@@ -10,6 +11,7 @@ This script was developed to assist customers with their exchange hybrid migrati
 
 ## Pre-requisites
 * Powershell v3+
+* Exchange Management Tools
 
 ## Disclaimer
 THIS CODE IS PROVIDED AS IS WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
