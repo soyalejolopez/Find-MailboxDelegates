@@ -175,16 +175,20 @@ Begin{
 
                    if ($external) {
                         $del = Get-Recipient -Identity $external.identity.tostring() -ErrorAction silentlyContinue
-                        if ($del) {return $del}
-                        else 
+                        if ($del) 
                         {
-                            Write-Host "Found external linked account $recipient associated to $($external.identity) mailbox, but cannot get the Recipient" -ForegroundColor red
+                            $error.Clear()
+                            return $del
+                        }
+                        else 
+                        { 
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found external linked account $recipient associated to $($external.identity) mailbox, but cannot get the Recipient property"
                             return $null
                         }
                    }
                    Else
                    {
-                        Write-Host "Looks like $recipient is not here!" -ForegroundColor red
+                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Unable to find Mailbox with LinkedMasterAccount associated to $recipient" 
                         return $null
                    }
                 }
