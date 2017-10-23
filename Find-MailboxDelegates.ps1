@@ -291,7 +291,7 @@ Begin{
                             }
                         }
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check CalendarFolder  : $Error"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check CalendarFolder : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
                         }
                     }
 
@@ -350,7 +350,7 @@ Begin{
                         }
 
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check FullAccess : $Error"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check FullAccess : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
                         }
                     }
 
@@ -418,7 +418,7 @@ Begin{
                         }
 
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendAs  : $Error"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendAs  : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
                         }
                     }
 
@@ -449,7 +449,7 @@ Begin{
                         }
                         
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendOnBehalfTo  : $Error"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendOnBehalfTo  : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
                         }
                     }
                     
@@ -484,7 +484,7 @@ Begin{
                         $node.Progress = "Failed"
                     }
                     $updateXML.save($ProgressXMLFile)
-                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Error: $($Mailbox.PrimarySMTPAddress) : $_ "
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX= $($Mailbox.PrimarySMTPAddress) ERROR= $($_.InvocationInfo.Line) $($_.InvocationInfo.PositionMessage)"
                 }
             }
 
