@@ -32,7 +32,7 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 07172017
+Version: 10232017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -768,7 +768,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "07172017"
+        $Version = "10232017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
