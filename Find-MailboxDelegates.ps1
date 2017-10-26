@@ -32,7 +32,7 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 10232017
+Version: 10262017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -484,7 +484,7 @@ Begin{
                         $node.Progress = "Failed"
                     }
                     $updateXML.save($ProgressXMLFile)
-                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX= $($Mailbox.PrimarySMTPAddress) ERROR= $($_.InvocationInfo.Line) $($_.InvocationInfo.PositionMessage)"
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX=$($Mailbox.PrimarySMTPAddress) ERROR=$($_.exception.message) POSITION=$($_.InvocationInfo.Line) $($_.InvocationInfo.PositionMessage)"
                 }
             }
 
@@ -768,7 +768,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "10232017"
+        $Version = "10262017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
