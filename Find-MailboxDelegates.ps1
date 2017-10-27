@@ -32,7 +32,7 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 10262017
+Version: 10272017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -213,11 +213,11 @@ Begin{
                     
 
                     #Variables
-                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $UserEmail"
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $($UserEmail)"
                     $CollectPermissions = New-Object System.Collections.Generic.List[System.Object] 
                     $Mailbox = Get-mailbox $UserEmail -EA SilentlyContinue
                     If(!$Mailbox){
-                        throw "Problem getting mailbox for $UserEmail : $_" 
+                        throw "Problem getting mailbox for $($UserEmail) : $_" 
                     }
 
                     #Enumerate Groups/Send As - moving this part outside of the function for faster processing
@@ -270,20 +270,21 @@ Begin{
                                     }
                                 }
                                 Else{
-                                    #$delegate = Get-Recipient -Identity $perm.user.tostring().replace(":\Calendar","") -ErrorAction SilentlyContinue
-                                    $delegate = Get-RecipientCustom $perm.user.adrecipient.primarysmtpaddress.tostring().replace(":\Calendar","")
+                                    If($perm.user.adrecipient.primarysmtpaddress -ne $null){                               
+                                        $delegate = Get-RecipientCustom $perm.user.adrecipient.primarysmtpaddress.tostring().replace(":\Calendar","")
 
-                                    If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
-							            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
-                                            If($ExcludedServiceAccts){
-                                                if(-not ($ExcludedServiceAccts -contains $delegate.primarySMTPAddress.tostring() -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                        If($mailbox.primarySMTPAddress -and $delegate.primarySMTPAddress){
+                                            If(-not ($mailbox.primarySMTPAddress.ToString() -eq $delegate.primarySMTPAddress.ToString())){
+                                                If($ExcludedServiceAccts){
+                                                    if(-not ($ExcludedServiceAccts -contains $delegate.primarySMTPAddress.tostring() -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($delegate.primarySMTPAddress.ToString())"
+                                                        $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Calendar Folder"})
+                                                    }
+                                                }
+                                                Else{
                                                     Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($delegate.primarySMTPAddress.ToString())"
                                                     $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Calendar Folder"})
                                                 }
-                                            }
-                                            Else{
-                                                Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($delegate.primarySMTPAddress.ToString())"
-                                                $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $delegate.primarySMTPAddress.ToString(); AccessRights = "Calendar Folder"})
                                             }
                                         }
                                     }
@@ -768,7 +769,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "10262017"
+        $Version = "10272017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
