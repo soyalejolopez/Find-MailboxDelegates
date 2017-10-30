@@ -32,7 +32,7 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 10272017
+Version: 10302017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -292,7 +292,7 @@ Begin{
                             }
                         }
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check CalendarFolder : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX=$($Mailbox.PrimarySMTPAddress) PERM=CalendarFolder ERROR=$($error[0].ToString()) POSITION=$($error[0].InvocationInfo.PositionMessage)"
                         }
                     }
 
@@ -351,7 +351,7 @@ Begin{
                         }
 
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check FullAccess : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX=$($Mailbox.PrimarySMTPAddress) PERM=FullAccess ERROR=$($error[0].ToString()) POSITION=$($error[0].InvocationInfo.PositionMessage)"
                         }
                     }
 
@@ -419,7 +419,7 @@ Begin{
                         }
 
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendAs  : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX=$($Mailbox.PrimarySMTPAddress) PERM=SendAs ERROR=$($error[0].ToString()) POSITION=$($error[0].InvocationInfo.PositionMessage)"
                         }
                     }
 
@@ -450,7 +450,7 @@ Begin{
                         }
                         
                         If($Error){
-                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "$($Mailbox.PrimarySMTPAddress) : Check SendOnBehalfTo  : $error[0].ToString() + $error[0].InvocationInfo.PositionMessage"
+                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX=$($Mailbox.PrimarySMTPAddress) PERM=SendOnBehalfTo ERROR=$($error[0].ToString()) POSITION=$($error[0].InvocationInfo.PositionMessage)"
                         }
                     }
                     
@@ -758,6 +758,19 @@ Begin{
                 }
             }
 
+        Function CleanUp-PreviousRun() {
+            try{
+                If(test-path $PermsOutputFile){Remove-item -path $PermsOutputFile}
+                If(test-path $BatchesFile){Remove-item -path $BatchesFile} 
+                If(test-path $MigrationScheduleFile){Remove-item -path $MigrationScheduleFile}
+                #$ProgressXMLFile doesn't have to be wiped since this is recreated every time
+                Write-LogEntry -LogName:$LogFile -LogEntryText "Successfully cleaned up previous run results."
+            }
+            catch{
+                Write-LogEntry -LogName:$LogFile -LogEntryText "Unable to clean up csv outputs from previous run. This needs to be done to avoid mixed results. ERROR=$($_) " -ForegroundColor Red
+                exit
+            }
+        }
         #endregion functions
 
         #Script Variables
@@ -769,7 +782,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "10272017"
+        $Version = "10302017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
@@ -812,6 +825,12 @@ Begin{
 
             $permission = "Send As"
             $right = $ext.psbase.Children | ? { $_.DisplayName -eq $permission }
+        }
+
+        #Check if re-running the script without resume. Clean outputs from previous run to prevent data corruption
+        If((!$Resume) -and (test-path $PermsOutputFile)){
+            Write-LogEntry -LogName:$LogFile -LogEntryText "Clean up previous run to avoid mixed results" -ForegroundColor White
+            CleanUp-PreviousRun
         }
 
         #Set scope to find objects in other domains
