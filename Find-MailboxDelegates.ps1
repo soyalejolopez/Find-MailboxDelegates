@@ -32,7 +32,7 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 10302017
+Version: 10312017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -215,9 +215,10 @@ Begin{
                     #Variables
                     Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Get Permissions for: $($UserEmail)"
                     $CollectPermissions = New-Object System.Collections.Generic.List[System.Object] 
+                    $Error.Clear()
                     $Mailbox = Get-mailbox $UserEmail -EA SilentlyContinue
                     If(!$Mailbox){
-                        throw "Problem getting mailbox for $($UserEmail) : $_" 
+                        throw "Problem getting mailbox for $($UserEmail) : $($error[0].ToString())" 
                     }
 
                     #Enumerate Groups/Send As - moving this part outside of the function for faster processing
@@ -480,12 +481,12 @@ Begin{
                 }
                 catch{
                     $updateXML = [System.Xml.XmlDocument](Get-Content $ProgressXMLFile)
-                    $node = $updateXML.Mailboxes.Mailbox | ?{$_.Name -eq $Mailbox.PrimarySMTPAddress}
+                    $node = $updateXML.Mailboxes.Mailbox | ?{$_.Name -eq $UserEmail}
                     If($node -ne $null){
                         $node.Progress = "Failed"
                     }
                     $updateXML.save($ProgressXMLFile)
-                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX=$($Mailbox.PrimarySMTPAddress) ERROR=$($_.exception.message) POSITION=$($_.InvocationInfo.Line) $($_.InvocationInfo.PositionMessage)"
+                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "MBX=$($UserEmail) ERROR=$($_.exception.message) POSITION=$($_.InvocationInfo.Line) $($_.InvocationInfo.PositionMessage)"
                 }
             }
 
@@ -782,7 +783,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "10302017"
+        $Version = "10312017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
@@ -829,7 +830,7 @@ Begin{
 
         #Check if re-running the script without resume. Clean outputs from previous run to prevent data corruption
         If((!$Resume) -and (test-path $PermsOutputFile)){
-            Write-LogEntry -LogName:$LogFile -LogEntryText "Clean up previous run to avoid mixed results" -ForegroundColor White
+            Write-LogEntry -LogName:$LogFile -LogEntryText "Clean up previous run to avoid mixed results" -ForegroundColor Gray
             CleanUp-PreviousRun
         }
 
