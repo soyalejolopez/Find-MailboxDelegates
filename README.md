@@ -43,7 +43,7 @@ Collect calendar permissions
 * PARAMETER SendAs  
 Collect Send As permissions
 
-* PARAMETER EnumerateGroupsc  
+* PARAMETER EnumerateGroups  
 This will enumerate groups that have permissions to mailboxes and include in the batching logic.
 
 *This will slow down processing.*
