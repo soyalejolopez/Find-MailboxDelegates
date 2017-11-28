@@ -32,7 +32,7 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 10312017
+Version: 11282017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -783,7 +783,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "10312017"
+        $Version = "11282017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
@@ -794,6 +794,8 @@ Begin{
         Write-LogEntry -LogName:$LogFile -LogEntryText "User: $user Computer: $computer Version: $Version" -foregroundcolor Yellow
         ""
         Write-LogEntry -LogName:$LogFile -LogEntryText "Script parameters passed: $($PSBoundParameters.GetEnumerator())" 
+        ""
+        Write-LogEntry -LogName:$LogFile -LogEntryText "Powershell version: $($PSVersionTable.PSVersion.Major)" 
         ""
         Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Check" -ForegroundColor Green 
         
