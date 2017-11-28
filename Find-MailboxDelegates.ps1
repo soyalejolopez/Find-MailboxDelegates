@@ -791,11 +791,9 @@ Begin{
         $ErrorActionPreference = "SilentlyContinue"
 
         ""
-        Write-LogEntry -LogName:$LogFile -LogEntryText "User: $user Computer: $computer Version: $Version" -foregroundcolor Yellow
+        Write-LogEntry -LogName:$LogFile -LogEntryText "User: $user Computer: $computer ScriptVersion: $Version PowershellVersion: $($PSVersionTable.PSVersion.Major)" -foregroundcolor Yellow
         ""
         Write-LogEntry -LogName:$LogFile -LogEntryText "Script parameters passed: $($PSBoundParameters.GetEnumerator())" 
-        ""
-        Write-LogEntry -LogName:$LogFile -LogEntryText "Powershell version: $($PSVersionTable.PSVersion.Major)" 
         ""
         Write-LogEntry -LogName:$LogFile -LogEntryText "Pre-flight Check" -ForegroundColor Green 
         
@@ -818,7 +816,11 @@ Begin{
             ConnectTo-Exchange $ExchServerFQDN | Out-Null
             ""
         }
-        
+        $exchserversession = get-pssession | ?{$_.configurationname -eq "Microsoft.Exchange"} | select -expandproperty computername 
+        $exchangeversion = get-exchangeserver $exchserversession | select -expandproperty AdminDisplayVersion
+        Write-LogEntry -LogName:$LogFile -LogEntryText "ExchangeServerName: $($exchserversession) ExchangeServerVersion: $($exchangeversion)" 
+        ""
+
         #Open connection to AD - this will be used to enumerate groups and collect Send As permissions
         If(($EnumerateGroups -eq $true) -or ($SendAs -eq $true)){ 
             $dse = [ADSI]"LDAP://Rootdse"
