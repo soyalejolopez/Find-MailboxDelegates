@@ -218,7 +218,7 @@ Begin{
                     $Error.Clear()
                     $Mailbox = Get-mailbox $UserEmail -EA SilentlyContinue
                     If(!$Mailbox){
-                        throw "Problem getting mailbox for $($UserEmail) : $($error[0].ToString())" 
+                        throw "Problem getting mailbox for $($UserEmail) : $($error)" 
                     }
 
                     #Enumerate Groups/Send As - moving this part outside of the function for faster processing
