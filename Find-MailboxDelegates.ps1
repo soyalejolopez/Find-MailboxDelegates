@@ -136,7 +136,8 @@ param(
     [string]$ExcludeGroupsCSV,
     [string]$ExchServerFQDN,
     [switch]$Resume,
-    [switch]$BatchUsers
+    [switch]$BatchUsers, 
+    [switch]$BatchUsersOnly
 )
 
 Begin{
@@ -819,7 +820,7 @@ Begin{
         If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume -or $AccountResourceEnv)){
             throw "BatchUsers can't be combined with these other switches."
         }
-        If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers -and $BatchUsersOnly){
+        If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers -and !$BatchUsersOnly){
             throw "Include the switches for the permissions you want to query on. Check the read me file for more details."
         }
 
