@@ -32,7 +32,7 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 11282017
+Version: 12122017
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -83,6 +83,12 @@ Make sure not to use in conjunction with the InputMailboxesCSV switch.
 .PARAMETER BatchUsers
 Use this if you want to skip collecting permissions and only run Step 2 and Step 3. 
 Make sure you have the permissions output file in the same directory (Find-MailboxDelegates-Permissions.csv).
+
+.PARAMETER BatchUsersOnly
+Use this if you want to skip collecting permissions (step1) and creating a migration schedule (step 3). This won't require an active exchange session, but make sure you have the permissions output file in the same directory (Find-MailboxDelegates-Permissions.csv).
+
+.PARAMETER AccountResourceEnv
+Switch to run the script taking into account an Account/Resource environment
 
 .EXAMPLE
 #Export only SendOnBehalfTo and Send As permissions and Enumerate Groups for all mailboxes.  
@@ -783,7 +789,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "11282017"
+        $Version = "12122017"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
@@ -802,8 +808,15 @@ Begin{
             throw "Powershell V3+ is required. If you're running from Exchange Shell, it may be defaulting to PS2.0. Run 'powershell -version 3' and re-run the script."
         }
 
+        #Run only the batch users step if the switch BatchUsersOnly switch has been added 
+        If($BatchUsersOnly){
+            Write-LogEntry -LogName:$LogFile -LogEntryText "Running only Step #2: Batch Users" -ForegroundColor Yellow
+            Create-Batches -InputPermissionsFile $PermsOutputFile
+            exit     
+        }
+
         #Check switches provided are acceptable
-        If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume)){
+        If($BatchUsers -and ($FullAccess -or $SendOnBehalfTo -or $Calendar -or $SendAs -or $InputMailboxesCSV -or $EnumerateGroups -or $ExcludeServiceAccts -or $ExcludeGroups -or $Resume -or $AccountResourceEnv)){
             throw "BatchUsers can't be combined with these other switches."
         }
         If(!$FullAccess -and !$SendOnBehalfTo -and !$Calendar -and !$SendAs -and !$BatchUsers){
@@ -842,8 +855,10 @@ Begin{
         Set-AdServerSettings -ViewEntireForest $True
 
         #Used for Acccount/Resource models
-        Write-LogEntry -LogName:$LogFile -LogEntryText "Creating Mailboxes lookup table" -ForegroundColor Gray 
-        $Script:mailboxesLookup = Get-Mailbox -ResultSize Unlimited
+        If($AccountResourceEnv){
+            Write-LogEntry -LogName:$LogFile -LogEntryText "Creating Mailboxes lookup table for Account/Resource Environment" -ForegroundColor Gray 
+            $Script:mailboxesLookup = Get-Mailbox -ResultSize Unlimited
+        }
 
         #Get Mailboxes
         If($Resume){
@@ -889,7 +904,12 @@ Begin{
                 $xmlDoc.save($ProgressXMLFile)
             }
             Else{
-                $ListOfMailboxes = $mailboxesLookup | select PrimarySMTPAddress
+                If($mailboxesLookup){
+                    $ListOfMailboxes = $mailboxesLookup | select PrimarySMTPAddress
+                }
+                Else{
+                    $ListOfMailboxes = Get-Mailbox -ResultSize Unlimited | select PrimarySMTPAddress
+                }
 
                 #write to xml for progress tracking
                 [xml]$xmlDoc = New-Object System.Xml.XmlDocument
