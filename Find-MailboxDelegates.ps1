@@ -734,18 +734,27 @@ Begin{
                        $user = get-user $item.user -erroraction SilentlyContinue
 		   
                        If(![string]::IsNullOrEmpty($user.WindowsEmailAddress)){
-			                $mbStats = Get-MailboxStatistics $user.WindowsEmailAddress.tostring() | select totalitemsize
-			                If($mbStats.totalitemsize.value)
+					   
+					   		#Mailbox size for user				   
+			                $mbStats = (Get-MailboxStatistics $user.WindowsEmailAddress.tostring()).totalitemsize.value
+							
+							#Add mailbox size for archive mailbox if present
+							If((Get-Mailbox $user.WindowsEmailAddress.tostring()).ArchiveDatabase -ne $null) {
+								$mbStatsArchive = (Get-MailboxStatistics $user.WindowsEmailAddress.tostring() -Archive).totalitemsize.value
+								$mbStats += $mbStatsArchive
+							}
+							
+			                If($mbStats)
                             {
                                 #if connecting through remote pshell, and not using Exo server shell, the data comes as 
                                 #TypeName: Deserialized.Microsoft.Exchange.Data.ByteQuantifiedSize
-                                if ( ($mbStats.TotalItemSize.Value.GetType()).name.ToString() -eq "ByteQuantifiedSize")
+                                if ( ($mbStats.GetType()).name.ToString() -eq "ByteQuantifiedSize")
                                 {
-                                    $mailboxSize =  $mbStats.totalitemsize.value.ToMb()
+                                    $mailboxSize =  $mbStats.ToMb()
                                 }
                                 else
                                 {
-                                    $mailboxSize =  $mbStats.TotalItemSize.Value.ToString().split("(")[1].split(" ")[0].replace(",","")/1024/1024
+                                    $mailboxSize =  $mbStats.ToString().split("(")[1].split(" ")[0].replace(",","")/1024/1024
                                 }
                                 
 			                }
