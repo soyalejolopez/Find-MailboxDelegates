@@ -19,6 +19,8 @@ has been advised of the possibility of such damages.
 We have developed this script because cross premises permissions are not supported with Exchange Hybrid environments: https://technet.microsoft.com/en-us/library/jj906433(v=exchg.150).aspx.
 With this script you can export Exchange 2010/2013 on premises permissions, find their associated delegates, and produce a report of mailboxes with their recommended batch to minimize impact to those users.   
 
+Requirement: Active Directory Module
+
 Steps performed by the script: 
  
     1)Collect permissions 
@@ -32,7 +34,8 @@ Steps performed by the script:
     4)Run one of the scripts with the -BatchUsers - this will bypass collecting permissions and jump straight into batching users using the permissinos output in the same directory as the script  
 
 =========================================
-Version: 12122017
+Version: 
+    06122018: Update group enumeration logic
 
 Authors: 
 Alejandro Lopez - alejanl@microsoft.com
@@ -119,9 +122,12 @@ Switch to run the script taking into account an Account/Resource environment
 .\Find-MailboxDelegates.ps1 -FullAccess -SendOnBehalfTo -SendAs -Calendar -ExcludeServiceAcctsCSV "c:\serviceaccts.csv" -ExcludeGroupsCSV "c:\groups.csv"
 
 .EXAMPLE
-#Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 and 3 to batch users
-.\Find-MailboxDelegates.ps1 -BatchUsers
+#Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 to batch users
+.\Find-MailboxDelegates.ps1 -BatchUsersOnly
 
+.EXAMPLE
+#Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 and 3 to batch users and creation migration schedule file
+.\Find-MailboxDelegates.ps1 -BatchUsers
 
 #>
 
@@ -256,22 +262,18 @@ Begin{
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
                                             Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : Enumerate Group $($ifGroup.distinguishedName)"
-					                        $dsLookFor.Filter = "(&(memberof:1.2.840.113556.1.4.1941:=$($ifGroup.distinguishedName))(objectCategory=user))" 
-	                                        $dsLookFor.PageSize  = 1000
-	                                        $dsLookFor.SearchScope = "subtree" 
-	                                        $mail = $dsLookFor.PropertiesToLoad.Add("mail")
-	                                        $lstUsr = $dsLookFor.findall()
+					                        $lstUsr = Get-AdGroup -identity $ifGroup.Name | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
 	                                        foreach ($usrTmp in $lstUsr) {
-                                                $usrTmpEmail = $usrTmp.Properties["mail"]
+                                                $usrTmpEmail = $usrTmp.Mail
                                                 If($ExcludedServiceAccts){
-                                                    if(-not ($ExcludedServiceAccts -contains $usrTmpEmail[0] -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
-                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($usrTmpEmail[0])"
-                                                        $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Calendar Folder"})
+                                                    if(-not ($ExcludedServiceAccts -contains $usrTmpEmail -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($usrTmpEmail)"
+                                                        $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail; AccessRights = "Calendar Folder"})
                                                     }
                                                 }
                                                 Else{
-                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($usrTmpEmail[0])"
-                                                    $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Calendar Folder"})
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : $($usrTmpEmail)"
+                                                    $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail; AccessRights = "Calendar Folder"})
                                                 }
 	                                        }
 				                        }
@@ -315,22 +317,18 @@ Begin{
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
                                             Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : Enumerate Group $($ifGroup.distinguishedName)"
-					                        $dsLookFor.Filter = "(&(memberof:1.2.840.113556.1.4.1941:=$($ifGroup.distinguishedName))(objectCategory=user))" 
-	                                        $dsLookFor.PageSize  = 1000
-	                                        $dsLookFor.SearchScope = "subtree" 
-	                                        $mail = $dsLookFor.PropertiesToLoad.Add("mail")
-	                                        $lstUsr = $dsLookFor.findall()
+					                        $lstUsr = Get-AdGroup -identity $ifGroup.Name | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
 	                                        foreach ($usrTmp in $lstUsr) {
-                                                $usrTmpEmail = $usrTmp.Properties["mail"]
+                                                $usrTmpEmail = $usrTmp.Mail
                                                 If($ExcludedServiceAccts){
-                                                    if(-not ($ExcludedServiceAccts -contains $usrTmpEmail[0] -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
-                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($usrTmpEmail[0])"
-                                                        $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Full Access"})
+                                                    if(-not ($ExcludedServiceAccts -contains $usrTmpEmail -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($usrTmpEmail)"
+                                                        $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail; AccessRights = "Full Access"})
                                                     }
                                                 }
                                                 Else{
-                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($usrTmpEmail[0])"
-                                                    $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Full Access"})
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : $($usrTmpEmail)"
+                                                    $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail; AccessRights = "Full Access"})
                                                 }
 	                                        }
 				                        }
@@ -383,22 +381,18 @@ Begin{
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($ExcludedGroups -contains $ifGroup.Name)){
                                             Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : Enumerate Group $($ifGroup.distinguishedName)"
-                                            $dsLookFor.Filter = "(&(memberof:1.2.840.113556.1.4.1941:=$($ifGroup.distinguishedName))(objectCategory=user))" 
-	                                        $dsLookFor.PageSize  = 1000
-	                                        $dsLookFor.SearchScope = "subtree" 
-	                                        $mail = $dsLookFor.PropertiesToLoad.Add("mail")
-	                                        $lstUsr = $dsLookFor.findall()
+                                            $lstUsr = Get-AdGroup -identity $ifGroup.Name | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
 	                                        foreach ($usrTmp in $lstUsr) {
-                                                $usrTmpEmail = $usrTmp.Properties["mail"]
+                                                $usrTmpEmail = $usrTmp.Mail
                                                 If($ExcludedServiceAccts){
-                                                    if(-not ($ExcludedServiceAccts -contains $usrTmpEmail[0] -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
-                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($usrTmpEmail[0])"
-                                                        $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Send As"})
+                                                    if(-not ($ExcludedServiceAccts -contains $usrTmpEmail -or $ExcludedServiceAccts -contains $mailbox.primarySMTPAddress.ToString())){
+                                                        Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($usrTmpEmail)"
+                                                        $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail; AccessRights = "Send As"})
                                                     }
                                                 }
                                                 Else{
-                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($usrTmpEmail[0])"
-                                                    $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail[0]; AccessRights = "Send As"})
+                                                    Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : $($usrTmpEmail)"
+                                                    $CollectPermissions.add([pscustomobject]@{Mailbox = $Mailbox.PrimarySMTPAddress; User = $usrTmpEmail; AccessRights = "Send As"})
                                                 }
 	                                        }
 				                        }
@@ -790,7 +784,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "12122017"
+        $Version = "06122018"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
@@ -836,6 +830,12 @@ Begin{
         ""
 
         #Open connection to AD - this will be used to enumerate groups and collect Send As permissions
+        $checkADModule = get-module -listavailable activedirectory
+        If($checkADModule -eq $null){
+            throw "Please install the Active Direcotry Module: https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2008-R2-and-2008/dd378937(v=ws.10) "
+        }
+        Import-Module -Name ActiveDirectory
+
         If(($EnumerateGroups -eq $true) -or ($SendAs -eq $true)){ 
             $dse = [ADSI]"LDAP://Rootdse"
             $ext = [ADSI]("LDAP://CN=Extended-Rights," + $dse.ConfigurationNamingContext)
@@ -847,8 +847,8 @@ Begin{
         }
 
         #Check if re-running the script without resume. Clean outputs from previous run to prevent data corruption
-        If((!$Resume) -and (test-path $PermsOutputFile)){
-            Write-LogEntry -LogName:$LogFile -LogEntryText "Clean up previous run to avoid mixed results" -ForegroundColor Gray
+        If((!$Resume) -and (test-path $PermsOutputFile) -and (!$BatchUsers) -and (!$BatchUsersOnly)){
+            Write-LogEntry -LogName:$LogFile -LogEntryText "Clean up previous run to avoid mixed results" -ForegroundColor Yellow
             CleanUp-PreviousRun
         }
 
