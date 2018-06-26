@@ -35,6 +35,7 @@ Steps performed by the script:
 
 =========================================
 Version: 
+	06262018: Update group enumeration cross domain logic
     06122018: Update group enumeration logic
 
 Authors: 
@@ -123,6 +124,7 @@ Switch to run the script taking into account an Account/Resource environment
 
 .EXAMPLE
 #Skip collect permissions (assumes you already have a permissions output file) and only run Step 2 to batch users
+
 .\Find-MailboxDelegates.ps1 -BatchUsersOnly
 
 .EXAMPLE
@@ -261,8 +263,11 @@ Begin{
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
-                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : CalendarFolder : Enumerate Group $($ifGroup.distinguishedName)"
-					                        $lstUsr = Get-AdGroup -identity $ifGroup.Name | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
+                                            $groupDomainName = $ifgroup.Identity | select DomainId
+                                            $groupDomainName = $groupDomainName.domainid.tostring()
+                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : Calendar : Enumerate Group $($ifGroup.distinguishedName) Domain Name: $groupDomainName"
+                                            $lstUsr = Get-AdGroup -identity $ifGroup.Name -Server $groupDomainName | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
+
 	                                        foreach ($usrTmp in $lstUsr) {
                                                 $usrTmpEmail = $usrTmp.Mail
                                                 If($ExcludedServiceAccts){
@@ -316,8 +321,11 @@ Begin{
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($excludedGroups -contains $ifGroup.Name)){
-                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : Enumerate Group $($ifGroup.distinguishedName)"
-					                        $lstUsr = Get-AdGroup -identity $ifGroup.Name | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
+                                            $groupDomainName = $ifgroup.Identity | select DomainId
+                                            $groupDomainName = $groupDomainName.domainid.tostring()
+                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : FullAccess : Enumerate Group $($ifGroup.distinguishedName) Domain Name: $groupDomainName"
+                                            $lstUsr = Get-AdGroup -identity $ifGroup.Name -Server $groupDomainName | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
+
 	                                        foreach ($usrTmp in $lstUsr) {
                                                 $usrTmpEmail = $usrTmp.Mail
                                                 If($ExcludedServiceAccts){
@@ -380,8 +388,11 @@ Begin{
                                 If($ifGroup){
                                     If($EnumerateGroups -eq $true){
 				                        If(-not ($ExcludedGroups -contains $ifGroup.Name)){
-                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : Enumerate Group $($ifGroup.distinguishedName)"
-                                            $lstUsr = Get-AdGroup -identity $ifGroup.Name | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
+                                            $groupDomainName = $ifgroup.Identity | select DomainId
+                                            $groupDomainName = $groupDomainName.domainid.tostring()
+                                            Write-LogEntry -LogName:$Script:LogFile -LogEntryText "Found permission : SendAs : Enumerate Group $($ifGroup.distinguishedName) Domain Name: $groupDomainName"
+                                            $lstUsr = Get-AdGroup -identity $ifGroup.Name -Server $groupDomainName | Get-ADGroupMember -Recursive | Get-ADUser -Properties Mail
+
 	                                        foreach ($usrTmp in $lstUsr) {
                                                 $usrTmpEmail = $usrTmp.Mail
                                                 If($ExcludedServiceAccts){
@@ -784,7 +795,7 @@ Begin{
         $BatchesFile = "$scriptPath\Find-MailboxDelegates-Batches.csv"
         $MigrationScheduleFile = "$scriptPath\Find-MailboxDelegates-Schedule.csv"
         $ProgressXMLFile = "$scriptPath\Find-MailboxDelegates-Progress.xml"
-        $Version = "06122018"
+        $Version = "06262018"
         $computer = $env:COMPUTERNAME
         $user = $env:USERNAME
 
